@@ -7,6 +7,8 @@ import { ConnectionManager } from './connection-manager';
 import { TenantConfig, TenantConfigSchema } from './schemas/tenant-config.schema';
 import { TenantConfigService } from './tenant-config.service';
 import { TenantConfigController } from './tenant-config.controller';
+import { User, UserSchema } from 'src/users/schemas/user.schema';
+import { InitializationService } from 'src/initialization/init.service';
 
 @Module({
   imports: [
@@ -16,9 +18,12 @@ import { TenantConfigController } from './tenant-config.controller';
     MongooseModule.forFeature([
       { name: Tenant.name, schema: TenantSchema },
     ]),
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+    ]),
     DatabaseModule,
   ],
-  providers: [TenantService,ConnectionManager,TenantConfigService],
+  providers: [TenantService,ConnectionManager,TenantConfigService,InitializationService],
   controllers: [TenantConfigController],
   exports: [TenantService,TenantConfigService],
 })

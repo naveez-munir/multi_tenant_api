@@ -1,7 +1,8 @@
-import { Controller, Get, Put, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Body, UseGuards, Request, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantConfigService } from './tenant-config.service';
 import { CurrentTenant } from '../common/decorators/tenant.decorator';
+import { IsSuperAdmin } from '../common/decorators/is-super-admin.decorator';
 import { Tenant } from './schemas/tenant.schema';
 
 @Controller('tenant-config')
@@ -9,19 +10,30 @@ import { Tenant } from './schemas/tenant.schema';
 export class TenantConfigController {
   constructor(private tenantConfigService: TenantConfigService) {}
 
-  @Get()
-  async getConfig(@CurrentTenant() tenant: Tenant) {
-    return this.tenantConfigService.getConfig(tenant._id.toString());
+  @Get('all')
+  async getAllConfigs() {
+    return this.tenantConfigService.getAllConfigs();
   }
 
   @Put()
   async updateConfig(
     @CurrentTenant() tenant: Tenant,
     @Body() configUpdate: any,
+    @Request() req: any,
   ) {
-    return this.tenantConfigService.updateConfig(
-      tenant._id.toString(),
-      configUpdate,
-    );
+    const { role, tenantId } = req.user;
+
+    if (role === 'SUPER_ADMIN') {
+      if (!configUpdate.tenantId) {
+        throw new BadRequestException('tenantId is required for updates by super admin');
+      }
+      return this.tenantConfigService.updateConfig(
+        configUpdate.tenantId,
+        configUpdate,
+      );
+    }
+
+    return this.tenantConfigService.updateConfig(tenantId, configUpdate);
   }
 }
+

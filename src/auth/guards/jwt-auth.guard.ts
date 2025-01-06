@@ -1,6 +1,7 @@
 import { Injectable, ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { TenantService } from '../../tenant/tenant.service';
+import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -18,6 +19,9 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
+    if(user.role === UserRole.SUPER_ADMIN){
+      return true
+    }
     // Verify tenant and setup connection
     try {
       const tenant = await this.tenantService.getTenantById(user.tenantId);

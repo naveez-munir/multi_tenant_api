@@ -7,6 +7,8 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { TenantModule } from '../tenant/tenant.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { User, UserSchema } from 'src/users/schemas/user.schema';
 
 @Module({
   imports: [
@@ -18,6 +20,7 @@ import { TenantModule } from '../tenant/tenant.module';
         signOptions: { expiresIn: '1d' },
       }),
     }),
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     UsersModule,
     TenantModule,
   ],

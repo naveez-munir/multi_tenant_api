@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { UsersService } from './users.service';
 import { TenantGuard } from '../tenant/guards/tenant.guard';
 import { CurrentTenant } from '../common/decorators/tenant.decorator';

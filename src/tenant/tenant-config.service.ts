@@ -10,6 +10,11 @@ export class TenantConfigService {
     private tenantConfigModel: Model<TenantConfig>,
   ) {}
 
+
+  async getAllConfigs(): Promise<TenantConfig[]> {
+    return this.tenantConfigModel.find().exec();
+  }
+
   async getConfig(tenantId: string): Promise<TenantConfig> {
     const config = await this.tenantConfigModel.findOne({ tenantId }).exec();
     if (!config) {

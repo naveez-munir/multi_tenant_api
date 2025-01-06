@@ -6,6 +6,7 @@ import configuration from './config/configuration';
 import { databaseConfig } from './config/database.config';
 import { TenantMiddleware } from './tenant/middleware/tenant.middleware';
 import { ConnectionManager } from './tenant/connection-manager';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ConnectionManager } from './tenant/connection-manager';
     }),
     DatabaseModule,
     TenantModule,
+    AuthModule,
   ],
   providers: [ConnectionManager],
 })
@@ -26,7 +28,8 @@ export class AppModule {
       .exclude(
         { path: 'auth/login', method: RequestMethod.POST },
         { path: 'auth/register', method: RequestMethod.POST },
-        'health/(.*)',
+        { path: 'health/(.*)', method: RequestMethod.ALL },
+        { path: 'tenant-config/(.*)', method: RequestMethod.ALL }
       )
       .forRoutes('*');
   }

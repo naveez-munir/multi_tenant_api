@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { TenantService } from '../../tenant/tenant.service';
+import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -17,7 +18,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    const { userId, tenantId } = payload;
+    const { userId,role, tenantId } = payload;
+    if(role === UserRole.SUPER_ADMIN){
+      return { userId,role, tenantId };
+    }
     const tenant = await this.tenantService.getTenantById(tenantId);
 
     if (!tenant || tenant.status !== 'active') {
