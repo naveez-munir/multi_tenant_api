@@ -7,19 +7,19 @@ export class TenantMiddleware implements NestMiddleware {
   constructor(private tenantService: TenantService) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
-    const tenantId = req.headers['x-tenant-id'] as string;
-    if(tenantId === 'admin') {
+    const tenantName = req.headers['x-tenant-name'] as string;
+    if(tenantName === 'admin') {
       next();
       return
     }
 
-    if (!tenantId) {
-      throw new NotFoundException('Tenant ID not provided');
+    if (!tenantName) {
+      throw new NotFoundException('Tenant Name not provided');
     }
 
     try {
-      const tenant = await this.tenantService.getTenantById(tenantId);
-      const connection = await this.tenantService.getTenantConnection(tenantId);
+      const tenant = await this.tenantService.getTenantByName(tenantName);
+      const connection = await this.tenantService.getTenantConnection(tenant._id.toString());
 
       // Attach tenant and connection to request object
       req['tenant'] = tenant;

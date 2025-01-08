@@ -17,9 +17,9 @@ export class AuthService {
     private tenantService: TenantService,
   ) {}
 
-  async validateUser(tenantId: string, email: string, password: string) {
+  async validateUser(tenantName: string, email: string, password: string) {
 
-    if (!tenantId) {
+    if (!tenantName) {
       const superAdmin = await this.userModel.findOne({
         email,
         role: UserRole.SUPER_ADMIN
@@ -31,13 +31,12 @@ export class AuthService {
       return null;
     }
 
-    const tenant = await this.tenantService.getTenantById(tenantId);
+    const tenant = await this.tenantService.getTenantByName(tenantName);
     if (!tenant) {
       throw new UnauthorizedException('Invalid tenant');
     }
-
-    const connection = await this.tenantService.getTenantConnection(tenantId);
-    const user = await this.usersService.findByEmail(connection, tenantId, email);
+    const connection = await this.tenantService.getTenantConnection(tenant._id.toString());
+    const user = await this.usersService.findByEmail(connection, tenant._id.toString(), email);
 
     if (user && await bcrypt.compare(password, user.password)) {
       return user;

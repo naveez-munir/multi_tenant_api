@@ -10,6 +10,7 @@ import { TenantConfigController } from './tenant-config.controller';
 import { User, UserSchema } from 'src/users/schemas/user.schema';
 import { InitializationService } from 'src/initialization/init.service';
 import { TenantController } from './tenant.controller';
+import { UsersModule } from 'src/users/users.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TenantController } from './tenant.controller';
       { name: User.name, schema: UserSchema },
     ]),
     DatabaseModule,
+    UsersModule
   ],
   providers: [TenantService,ConnectionManager,TenantConfigService,InitializationService],
   controllers: [TenantController,TenantConfigController],

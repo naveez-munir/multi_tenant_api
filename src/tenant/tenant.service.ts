@@ -4,6 +4,8 @@ import { Model } from 'mongoose';
 import { Tenant, TenantDocument } from './schemas/tenant.schema';
 import { DatabaseService } from '../database/database.service';
 import { ConnectionManager } from './connection-manager';
+import { UsersService } from 'src/users/users.service';
+import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Injectable()
 export class TenantService {
@@ -13,17 +15,40 @@ export class TenantService {
     @InjectModel(Tenant.name) private tenantModel: Model<TenantDocument>,
     private databaseService: DatabaseService,
     private connectionManager: ConnectionManager,
+    private userService: UsersService
   ) {}
 
   async createTenant(tenantData: Partial<Tenant>): Promise<TenantDocument> {
-    const tenant = new this.tenantModel(tenantData);
-    return tenant.save();
+    const savedTenant = await this.tenantModel.create({
+      name: tenantData.name,
+      databaseName: tenantData.databaseName
+    });
+    // Create a new connection for the tenant
+    const tenantConnection = await this.databaseService.createTenantConnection(savedTenant.databaseName);
+
+    //TODO create tenant super admin
+    const tenantAdminUser = {
+      name: 'Tenant Admin',
+      email: `tenantadmin@${savedTenant.name}.com`,
+      role: UserRole.TENANT_ADMIN,
+      password: 'password',
+      tenantId: savedTenant._id.toString(),
+    };
+    await this.userService.createUser(tenantConnection, savedTenant._id.toString(), tenantAdminUser);
+    return savedTenant;
   }
 
   async getTenantById(id: string): Promise<TenantDocument> {
     const tenant = await this.tenantModel.findById(id);
     if (!tenant) {
       throw new NotFoundException(`Tenant with ID ${id} not found`);
+    }
+    return tenant;
+  }
+  async getTenantByName(name: string): Promise<TenantDocument> {
+    const tenant = await this.tenantModel.findOne({name: name});
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with name ${name} not found`);
     }
     return tenant;
   }

@@ -7,10 +7,10 @@ export class AuthController {
 
   @Post('login')
   async login(
-    @Body() loginDto: { tenantId: string; email: string; password: string },
+    @Body() loginDto: { tenantName: string; email: string; password: string },
   ) {
     const user = await this.authService.validateUser(
-      loginDto.tenantId,
+      loginDto.tenantName,
       loginDto.email,
       loginDto.password,
     );
@@ -19,6 +19,6 @@ export class AuthController {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return this.authService.login(user, loginDto.tenantId);
+    return this.authService.login(user, loginDto.tenantName);
   }
 }

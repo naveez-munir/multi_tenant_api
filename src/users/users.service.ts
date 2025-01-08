@@ -35,7 +35,8 @@ export class UsersService {
     email: string
   ) {
     const repository = this.getUserRepository(connection, tenantId);
-    return repository.find({ email })[0]; // Get first matching user
+    const users =  await repository.find({email: email});
+    return users[0]; // Get first matching user
   }
 
   // Add other user-related methods as needed

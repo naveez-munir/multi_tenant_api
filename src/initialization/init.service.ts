@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
 import { User } from '../users/schemas/user.schema';
+import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Injectable()
 export class InitializationService implements OnModuleInit {
@@ -35,7 +36,7 @@ export class InitializationService implements OnModuleInit {
           email,
           password,
           name,
-          role: 'super_admin',
+          role: UserRole.SUPER_ADMIN,
           isActive: true
         });
 

@@ -8,7 +8,6 @@ export type TenantDocument = Tenant & Document;
   collection: 'tenants',
 })
 export class Tenant {
-  @Prop({ type: Types.ObjectId, auto: true })
   _id: Types.ObjectId;
   @Prop({ required: true, unique: true })
   name: string;
