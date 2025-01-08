@@ -29,7 +29,6 @@ export class AppModule {
         { path: 'auth/login', method: RequestMethod.POST },
         { path: 'auth/register', method: RequestMethod.POST },
         { path: 'health/(.*)', method: RequestMethod.ALL },
-        { path: 'tenant-config/(.*)', method: RequestMethod.ALL }
       )
       .forRoutes('*');
   }
