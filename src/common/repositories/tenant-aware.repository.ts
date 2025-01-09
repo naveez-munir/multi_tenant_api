@@ -42,4 +42,33 @@ export class TenantAwareRepository<T extends Document> {
       .exec();
     return result.deletedCount > 0;
   }
+
+  async findOneAndUpdate(
+    id: string,
+    data: Partial<T>,
+    options = { new: true }
+  ): Promise<T | null> {
+    return this.model
+      .findOneAndUpdate(
+        this.addTenantContext({ _id: id }),
+        data,
+        options
+      )
+      .exec();
+  }
+
+  async findOneAndDelete(id: string): Promise<T | null> {
+    return this.model
+      .findOneAndDelete(this.addTenantContext({ _id: id }))
+      .exec();
+  }
+
+  async toggleField(id: string, field: keyof T): Promise<T | null> {
+    const document = await this.findById(id);
+    if (!document) return null;
+
+    return this.findOneAndUpdate(id, {
+      [field]: !document[field]
+    } as Partial<T>);
+  }
 }
