@@ -1,7 +1,7 @@
 import { Document, Model } from 'mongoose';
 
 export class BaseRepository<T extends Document> {
-  constructor(private readonly model: Model<T>) {}
+  constructor(protected readonly model: Model<T>) {}
 
   async findById(id: string): Promise<T | null> {
     return this.model.findById(id).exec();
@@ -16,7 +16,7 @@ export class BaseRepository<T extends Document> {
     return entity.save();
   }
 
-  async update(id: string, data: Partial<T>): Promise<T | null> {
+  async findByIdAndUpdate(id: string, data: Partial<T>): Promise<T | null> {
     return this.model
       .findByIdAndUpdate(id, data, { new: true })
       .exec();

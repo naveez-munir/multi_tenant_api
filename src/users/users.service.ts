@@ -2,42 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { Connection } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserSchema } from './schemas/user.schema';
-import { ModelFactory } from '../common/factories/model.factory';
-import { TenantAwareRepository } from '../common/repositories/tenant-aware.repository';
+import { BaseService } from 'src/common/services/base.service';
 
 @Injectable()
-export class UsersService {
-  private getUserRepository(connection: Connection, tenantId: string) {
-    const model = ModelFactory.createForConnection<User>(
-      connection,
-      'User',
-      UserSchema
-    );
-    return new TenantAwareRepository(model, tenantId);
-  }
-
-  async createUser(
-    connection: Connection,
-    tenantId: string,
-    userData: Partial<User>
-  ) {
-    const repository = this.getUserRepository(connection, tenantId);
-    return repository.create(userData);
+export class UsersService extends BaseService<User> {
+  constructor() {
+    super('User', UserSchema);
   }
 
   async findUsers(connection: Connection, tenantId: string) {
-    const repository = this.getUserRepository(connection, tenantId);
-    return repository.find();
-  }
-
-  async findByEmail(
-    connection: Connection,
-    tenantId: string,
-    email: string
-  ) {
-    const repository = this.getUserRepository(connection, tenantId);
-    const users = await repository.find({ email: email });
-    return users[0];
+    const repository = this.getRepository(connection, tenantId);
+    return repository.find({}, { password: 0 });
   }
 
   async findById(
@@ -45,8 +20,18 @@ export class UsersService {
     tenantId: string,
     id: string
   ) {
-    const repository = this.getUserRepository(connection, tenantId);
-    return repository.findById(id);
+    const repository = this.getRepository(connection, tenantId);
+    return repository.findById(id, { password: 0 });
+  }
+
+  async findByEmail(
+    connection: Connection,
+    tenantId: string,
+    email: string
+  ) {
+    const repository = this.getRepository(connection, tenantId);
+    const users = await repository.find({ email });
+    return users[0] || null;
   }
 
   async updateUser(
@@ -55,13 +40,11 @@ export class UsersService {
     id: string,
     updateData: Partial<User>
   ) {
-    const repository = this.getUserRepository(connection, tenantId);
-
-    // Remove password from update data if present
     if (updateData.password) {
       delete updateData.password;
     }
 
+    const repository = this.getRepository(connection, tenantId);
     return repository.findOneAndUpdate(id, updateData);
   }
 
@@ -72,7 +55,7 @@ export class UsersService {
     currentPassword: string,
     newPassword: string
   ) {
-    const repository = this.getUserRepository(connection, tenantId);
+    const repository = this.getRepository(connection, tenantId);
     const user = await repository.findById(id);
 
     if (!user) {
@@ -88,21 +71,12 @@ export class UsersService {
     return repository.findOneAndUpdate(id, { password: hashedPassword });
   }
 
-  async deleteUser(
-    connection: Connection,
-    tenantId: string,
-    id: string
-  ) {
-    const repository = this.getUserRepository(connection, tenantId);
-    return repository.findOneAndDelete(id);
-  }
-
   async toggleUserStatus(
     connection: Connection,
     tenantId: string,
     id: string
   ) {
-    const repository = this.getUserRepository(connection, tenantId);
+    const repository = this.getRepository(connection, tenantId);
     return repository.toggleField(id, 'isActive');
   }
 }

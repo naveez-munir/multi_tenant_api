@@ -34,7 +34,7 @@ export class TenantService {
       password: 'password',
       tenantId: savedTenant._id.toString(),
     };
-    await this.userService.createUser(tenantConnection, savedTenant._id.toString(), tenantAdminUser);
+    await this.userService.create(tenantConnection, savedTenant._id.toString(), tenantAdminUser);
     return savedTenant;
   }
 

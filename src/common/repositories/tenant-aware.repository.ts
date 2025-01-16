@@ -1,24 +1,24 @@
-import { Model, Document, FilterQuery } from 'mongoose';
+import { Model, Document, FilterQuery, ProjectionType } from 'mongoose';
+import { BaseRepository } from './base.repository';
 
-export class TenantAwareRepository<T extends Document> {
-  constructor(
-    private readonly model: Model<T>,
-    private readonly tenantId: string,
-  ) {}
+export class TenantAwareRepository<T extends Document> extends BaseRepository<T> {
+  constructor(model: Model<T>, private readonly tenantId: string) {
+    super(model);
+  }
 
   private addTenantContext(filter: FilterQuery<T> = {}): FilterQuery<T> {
     return { ...filter, tenantId: this.tenantId };
   }
 
-  async findById(id: string): Promise<T | null> {
-    return this.model.findOne(this.addTenantContext({ _id: id })).exec();
+  override async findById(id: string,projection?: ProjectionType<T>): Promise<T | null> {
+    return this.model.findOne(this.addTenantContext({ _id: id }), projection).exec();
   }
 
-  async find(filter: FilterQuery<T> = {}): Promise<T[]> {
-    return this.model.find(this.addTenantContext(filter)).exec();
+  override async find(filter: FilterQuery<T> = {}, projection?: ProjectionType<T>): Promise<T[]> {
+    return this.model.find(this.addTenantContext(filter), projection).exec();
   }
 
-  async create(data: Partial<T>): Promise<T> {
+  override async create(data: Partial<T>): Promise<T> {
     const entity = new this.model({
       ...data,
       tenantId: this.tenantId,
@@ -26,7 +26,7 @@ export class TenantAwareRepository<T extends Document> {
     return entity.save();
   }
 
-  async update(id: string, data: Partial<T>): Promise<T | null> {
+  override async findByIdAndUpdate(id: string, data: Partial<T>): Promise<T | null> {
     return this.model
       .findOneAndUpdate(
         this.addTenantContext({ _id: id }),
@@ -36,13 +36,14 @@ export class TenantAwareRepository<T extends Document> {
       .exec();
   }
 
-  async delete(id: string): Promise<boolean> {
+  override async delete(id: string): Promise<boolean> {
     const result = await this.model
       .deleteOne(this.addTenantContext({ _id: id }))
       .exec();
     return result.deletedCount > 0;
   }
 
+  // Additional tenant-specific methods
   async findOneAndUpdate(
     id: string,
     data: Partial<T>,
