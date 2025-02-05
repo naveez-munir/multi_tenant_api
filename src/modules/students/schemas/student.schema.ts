@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { BaseEntity } from '../../common/schemas/base.schema';
+import { BaseEntity } from '../../../common/schemas/base.schema';
 import { Types } from 'mongoose';
 
 @Schema({
@@ -7,7 +7,9 @@ import { Types } from 'mongoose';
   collection: 'students',
 })
 export class Student extends BaseEntity {
-  @Prop({ required: true })
+  _id: Types.ObjectId;
+
+  @Prop({ required: true, unique: true })
   cniNumber: string;
 
   @Prop({ required: true })
@@ -23,28 +25,19 @@ export class Student extends BaseEntity {
   gender: string;
 
   @Prop({ enum: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] })
-  bloodGroup: string;
+  bloodGroup?: string;
 
   @Prop()
-  photoUrl: string;
+  photoUrl?: string;
 
-  @Prop({ required: true })
-  phone: string;
+  @Prop()
+  phone?: string;
 
-  @Prop({ required: true })
-  email: string;
+  @Prop({ required: true, unique: true, default: null })
+  email?: string;
 
-  @Prop({
-    type: {
-      line1: { type: String, required: true },
-      line2: { type: String },
-      city: { type: String, required: true },
-      state: { type: String, required: true },
-      zipCode: { type: String, required: true },
-      country: { type: String, required: true },
-    },
-  })
-  address: Record<string, any>;
+  @Prop()
+  address?: string;
 
   // Parent/Guardian Information
   @Prop({
@@ -62,11 +55,11 @@ export class Student extends BaseEntity {
   @Prop({ required: true })
   gradeLevel: string;
 
-  @Prop()
-  section: string;
+  @Prop({ type: Types.ObjectId, ref: 'Class' })
+  section?: Types.ObjectId;
 
   @Prop({ required: true, unique: true })
-  rollNumber: string;
+  rollNumber?: string;
 
   @Prop({ required: true })
   enrollmentDate: Date;
@@ -82,10 +75,10 @@ export class Student extends BaseEntity {
   exitStatus: string; // Reason for leaving the school
 
   @Prop()
-  exitDate: Date;
+  exitDate?: Date;
 
   @Prop()
-  exitRemarks: string;
+  exitRemarks?: string;
 
 
 
@@ -97,18 +90,8 @@ export class Student extends BaseEntity {
   status: string;
 
   @Prop({ type: Number, min: 0, max: 100 })
-  attendancePercentage: number;
+  attendancePercentage?: number;
 
-  @Prop({
-    type: [
-      {
-        title: { type: String, required: true },
-        description: { type: String },
-        date: { type: Date, required: true },
-      },
-    ],
-  })
-  awards: Record<string, any>[];
 
   // Documents
   @Prop({
@@ -128,6 +111,6 @@ export class Student extends BaseEntity {
 
 export const StudentSchema = SchemaFactory.createForClass(Student);
 
-StudentSchema.index({ email: 1, tenantId: 1 }, { unique: true });
+StudentSchema.index({ firstName: 1,email: 1,  cniNumber: 1,});
 
 
