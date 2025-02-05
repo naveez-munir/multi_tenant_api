@@ -1,6 +1,6 @@
 import { Injectable, ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { TenantService } from '../../tenant/tenant.service';
+import { TenantService } from '../../modules/tenant/tenant.service';
 import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Injectable()

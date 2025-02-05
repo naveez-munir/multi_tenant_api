@@ -5,10 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { UsersModule } from '../users/users.module';
-import { TenantModule } from '../tenant/tenant.module';
+import { UsersModule } from '../modules/users/users.module';
+import { TenantModule } from '../modules/tenant/tenant.module';
 import { MongooseModule } from '@nestjs/mongoose';
-import { User, UserSchema } from 'src/users/schemas/user.schema';
+import { User, UserSchema } from 'src/modules/users/schemas/user.schema';
 
 @Module({
   imports: [

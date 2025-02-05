@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
-import { User } from '../users/schemas/user.schema';
+import { User } from '../modules/users/schemas/user.schema';
 import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Injectable()

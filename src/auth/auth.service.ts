@@ -1,10 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { UsersService } from '../users/users.service';
-import { TenantService } from '../tenant/tenant.service';
+import { UsersService } from '../modules/users/users.service';
+import { TenantService } from '../modules/tenant/tenant.service';
 import { InjectModel } from '@nestjs/mongoose';
-import { User } from 'src/users/schemas/user.schema';
+import { User } from 'src/modules/users/schemas/user.schema';
 import { Model } from 'mongoose';
 import { UserRole } from 'src/common/interfaces/roleEnum';
 
