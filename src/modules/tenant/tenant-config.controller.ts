@@ -1,8 +1,8 @@
 import { Controller, Get, Put, Body, UseGuards, Request, BadRequestException } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { TenantConfigService } from './tenant-config.service';
-import { CurrentTenant } from '../common/decorators/tenant.decorator';
-import { IsSuperAdmin } from '../common/decorators/is-super-admin.decorator';
+import { CurrentTenant } from '../../common/decorators/tenant.decorator';
+import { IsSuperAdmin } from '../../common/decorators/is-super-admin.decorator';
 import { Tenant } from './schemas/tenant.schema';
 
 @Controller('tenant-config')

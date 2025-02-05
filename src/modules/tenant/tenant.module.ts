@@ -2,15 +2,15 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TenantService } from './tenant.service';
 import { Tenant, TenantSchema } from './schemas/tenant.schema';
-import { DatabaseModule } from '../database/database.module';
+import { DatabaseModule } from '../../database/database.module';
 import { ConnectionManager } from './connection-manager';
 import { TenantConfig, TenantConfigSchema } from './schemas/tenant-config.schema';
 import { TenantConfigService } from './tenant-config.service';
 import { TenantConfigController } from './tenant-config.controller';
-import { User, UserSchema } from 'src/users/schemas/user.schema';
+import { User, UserSchema } from 'src/modules/users/schemas/user.schema';
 import { InitializationService } from 'src/initialization/init.service';
 import { TenantController } from './tenant.controller';
-import { UsersModule } from 'src/users/users.module';
+import { UsersModule } from 'src/modules/users/users.module';
 
 @Module({
   imports: [

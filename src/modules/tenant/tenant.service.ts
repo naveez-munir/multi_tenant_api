@@ -2,9 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Tenant, TenantDocument } from './schemas/tenant.schema';
-import { DatabaseService } from '../database/database.service';
+import { DatabaseService } from '../../database/database.service';
 import { ConnectionManager } from './connection-manager';
-import { UsersService } from 'src/users/users.service';
+import { UsersService } from 'src/modules/users/users.service';
 import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Injectable()

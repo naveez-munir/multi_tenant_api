@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { Tenant } from './schemas/tenant.schema';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @Controller('tenants')
 @UseGuards(JwtAuthGuard)
