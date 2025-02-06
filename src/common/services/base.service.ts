@@ -8,37 +8,37 @@ export abstract class BaseService<T extends Document> {
     private readonly schema: any,
   ) {}
 
-  protected getRepository(connection: Connection, tenantId: string): TenantAwareRepository<T> {
+  protected getRepository(connection: Connection): TenantAwareRepository<T> {
     const model = ModelFactory.createForConnection<T>(
       connection,
       this.modelName,
       this.schema
     );
-    return new TenantAwareRepository<T>(model, tenantId);
+    return new TenantAwareRepository<T>(model);
   }
 
-  async findById(connection: Connection, tenantId: string, id: string): Promise<T | null> {
-    const repository = this.getRepository(connection, tenantId);
+  async findById(connection: Connection, id: string): Promise<T | null> {
+    const repository = this.getRepository(connection);
     return repository.findById(id);
   }
 
-  async find(connection: Connection, tenantId: string): Promise<T[]> {
-    const repository = this.getRepository(connection, tenantId);
+  async find(connection: Connection): Promise<T[]> {
+    const repository = this.getRepository(connection);
     return repository.find();
   }
 
-  async create(connection: Connection, tenantId: string, data: Partial<T>): Promise<T> {
-    const repository = this.getRepository(connection, tenantId);
+  async create(connection: Connection, data: Partial<T>): Promise<T> {
+    const repository = this.getRepository(connection);
     return repository.create(data);
   }
 
-  async findByIdAndUpdate(connection: Connection, tenantId: string, id: string, data: Partial<T>): Promise<T | null> {
-    const repository = this.getRepository(connection, tenantId);
+  async findByIdAndUpdate(connection: Connection, id: string, data: Partial<T>): Promise<T | null> {
+    const repository = this.getRepository(connection);
     return repository.findByIdAndUpdate(id, data);
   }
 
-  async delete(connection: Connection, tenantId: string, id: string): Promise<boolean> {
-    const repository = this.getRepository(connection, tenantId);
+  async delete(connection: Connection, id: string): Promise<boolean> {
+    const repository = this.getRepository(connection);
     return repository.delete(id);
   }
 }

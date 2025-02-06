@@ -36,7 +36,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid tenant');
     }
     const connection = await this.tenantService.getTenantConnection(tenant._id.toString());
-    const user = await this.usersService.findByEmail(connection, tenant._id.toString(), email);
+    const user = await this.usersService.findByEmail(connection, email);
 
     if (user && await bcrypt.compare(password, user.password)) {
       return user;
