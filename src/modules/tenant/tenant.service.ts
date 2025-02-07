@@ -32,9 +32,8 @@ export class TenantService {
       email: `tenantadmin@${savedTenant.name}.com`,
       role: UserRole.TENANT_ADMIN,
       password: 'password',
-      tenantId: savedTenant._id.toString(),
     };
-    await this.userService.create(tenantConnection, savedTenant._id.toString(), tenantAdminUser);
+    await this.userService.create(tenantConnection, tenantAdminUser);
     return savedTenant;
   }
 

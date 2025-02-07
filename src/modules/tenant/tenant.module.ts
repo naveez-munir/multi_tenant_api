@@ -11,6 +11,7 @@ import { User, UserSchema } from 'src/modules/users/schemas/user.schema';
 import { InitializationService } from 'src/initialization/init.service';
 import { TenantController } from './tenant.controller';
 import { UsersModule } from 'src/modules/users/users.module';
+import { StudentModule } from '../student/student.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { UsersModule } from 'src/modules/users/users.module';
       { name: User.name, schema: UserSchema },
     ]),
     DatabaseModule,
-    UsersModule
+    UsersModule,
+    StudentModule
   ],
   providers: [TenantService,ConnectionManager,TenantConfigService,InitializationService],
   controllers: [TenantController,TenantConfigController],
