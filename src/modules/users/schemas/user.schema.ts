@@ -8,11 +8,14 @@ import { UserRole } from 'src/common/interfaces/roleEnum';
   collection: 'users',
 })
 export class User extends BaseEntity {
-  @Prop({ required: true })
+  @Prop({ required: true, unique: true })
   email: string;
 
   @Prop({ required: true })
   name: string;
+
+  @Prop({required: true, unique: true})
+  cnic: string
 
   @Prop({ default: true })
   isActive: boolean;

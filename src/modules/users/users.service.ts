@@ -10,33 +10,30 @@ export class UsersService extends BaseService<User> {
     super('User', UserSchema);
   }
 
-  async findUsers(connection: Connection, tenantId: string) {
-    const repository = this.getRepository(connection, tenantId);
+  async findUsers(connection: Connection) {
+    const repository = this.getRepository(connection);
     return repository.find({}, { password: 0 });
   }
 
   async findById(
     connection: Connection,
-    tenantId: string,
     id: string
   ) {
-    const repository = this.getRepository(connection, tenantId);
+    const repository = this.getRepository(connection);
     return repository.findById(id, { password: 0 });
   }
 
   async findByEmail(
     connection: Connection,
-    tenantId: string,
     email: string
   ) {
-    const repository = this.getRepository(connection, tenantId);
+    const repository = this.getRepository(connection);
     const users = await repository.find({ email });
     return users[0] || null;
   }
 
   async updateUser(
     connection: Connection,
-    tenantId: string,
     id: string,
     updateData: Partial<User>
   ) {
@@ -44,18 +41,17 @@ export class UsersService extends BaseService<User> {
       delete updateData.password;
     }
 
-    const repository = this.getRepository(connection, tenantId);
+    const repository = this.getRepository(connection);
     return repository.findOneAndUpdate(id, updateData);
   }
 
   async updatePassword(
     connection: Connection,
-    tenantId: string,
     id: string,
     currentPassword: string,
     newPassword: string
   ) {
-    const repository = this.getRepository(connection, tenantId);
+    const repository = this.getRepository(connection);
     const user = await repository.findById(id);
 
     if (!user) {
@@ -73,10 +69,9 @@ export class UsersService extends BaseService<User> {
 
   async toggleUserStatus(
     connection: Connection,
-    tenantId: string,
     id: string
   ) {
-    const repository = this.getRepository(connection, tenantId);
+    const repository = this.getRepository(connection);
     return repository.toggleField(id, 'isActive');
   }
 }

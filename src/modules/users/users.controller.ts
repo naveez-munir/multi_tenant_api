@@ -18,7 +18,6 @@ export class UsersController {
   ) {
     return this.usersService.findUsers(
       req['tenantConnection'],
-      tenant._id.toString()
     );
   }
 
@@ -30,7 +29,6 @@ export class UsersController {
   ) {
     const user = await this.usersService.findById(
       req['tenantConnection'],
-      tenant._id.toString(),
       id
     );
     if (!user) {
@@ -47,7 +45,6 @@ export class UsersController {
   ) {
     return this.usersService.create(
       req['tenantConnection'],
-      tenant._id.toString(),
       userData
     );
   }
@@ -61,7 +58,6 @@ export class UsersController {
   ) {
     const user = await this.usersService.updateUser(
       req['tenantConnection'],
-      tenant._id.toString(),
       id,
       updateData
     );
@@ -80,7 +76,6 @@ export class UsersController {
   ) {
     const updated = await this.usersService.updatePassword(
       req['tenantConnection'],
-      tenant._id.toString(),
       id,
       passwordData.currentPassword,
       passwordData.newPassword
@@ -99,7 +94,6 @@ export class UsersController {
   ) {
     const deleted = await this.usersService.delete(
       req['tenantConnection'],
-      tenant._id.toString(),
       id
     );
     if (!deleted) {
@@ -116,7 +110,6 @@ export class UsersController {
   ) {
     const user = await this.usersService.toggleUserStatus(
       req['tenantConnection'],
-      tenant._id.toString(),
       id
     );
     if (!user) {
