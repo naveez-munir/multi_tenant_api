@@ -18,16 +18,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    const { userId,role, tenantId } = payload;
-    if(role === UserRole.SUPER_ADMIN){
-      return { userId,role, tenantId };
+    const { userId, role, tenantName } = payload;
+  
+    if (role === UserRole.SUPER_ADMIN) {
+      return { userId, role, tenantName };
     }
-    const tenant = await this.tenantService.getTenantById(tenantId);
 
+    const tenant = await this.tenantService.getTenantByName(tenantName);
     if (!tenant || tenant.status !== 'active') {
       throw new UnauthorizedException('Invalid tenant or tenant is inactive');
     }
-
-    return { userId, tenantId };
+    const connection = await this.tenantService.getTenantConnection(tenant._id.toString());
+    return { userId, role, tenantName, tenant, tenantConnection: connection };
   }
 }

@@ -44,12 +44,12 @@ export class AuthService {
     return null;
   }
 
-  async login(user: any, tenantId: string) {
+  async login(user: any, tenantName: string) {
     const payload = {
       userId: user._id,
       email: user.email,
       role: user.role,
-      tenantId: user.role === UserRole.SUPER_ADMIN ? null : tenantId
+      tenantName: user.role === UserRole.SUPER_ADMIN ? null : tenantName
     };
 
     return {
