@@ -1,4 +1,4 @@
-import { Model, Document, FilterQuery, ProjectionType } from 'mongoose';
+import { Model, Document, FilterQuery, ProjectionType, UpdateQuery } from 'mongoose';
 import { BaseRepository } from './base.repository';
 
 export class TenantAwareRepository<T extends Document> extends BaseRepository<T> {
@@ -63,5 +63,15 @@ export class TenantAwareRepository<T extends Document> extends BaseRepository<T>
     return this.findOneAndUpdate(id, {
       [field]: !document[field]
     } as Partial<T>);
+  }
+
+  async updateOne(
+    filter: FilterQuery<T>,
+    update: UpdateQuery<T>
+  ): Promise<T | null> {
+    const result = await this.model
+      .findOneAndUpdate(filter, update, { new: true })
+      .exec();
+    return result;
   }
 }
