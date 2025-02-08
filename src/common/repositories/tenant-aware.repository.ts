@@ -74,4 +74,43 @@ export class TenantAwareRepository<T extends Document> extends BaseRepository<T>
       .exec();
     return result;
   }
+
+  async insertMany(documents: Partial<T>[]): Promise<T[]> {
+    const result = await this.model.insertMany(documents);
+    return result as unknown as T[];
+  }
+
+  async findWithPopulate(query: FilterQuery<T>, populateField: string, selectFields?: string): Promise<T[]> {
+    return this.model
+      .find(query)
+      .populate(populateField, selectFields)
+      .exec();
+  }
+
+  async findWithSort(query: FilterQuery<T>, sort: any): Promise<T[]> {
+    return this.model
+      .find(query)
+      .sort(sort)
+      .exec();
+  }
+
+  async findWithOptions(
+    query: FilterQuery<T>,
+    options: {
+      sort?: any;
+      populate?: { path: string; select?: string };
+    }
+  ): Promise<T[]> {
+    let findQuery = this.model.find(query);
+
+    if (options.populate) {
+      findQuery = findQuery.populate(options.populate.path, options.populate.select);
+    }
+
+    if (options.sort) {
+      findQuery = findQuery.sort(options.sort);
+    }
+
+    return findQuery.exec();
+  }
 }
