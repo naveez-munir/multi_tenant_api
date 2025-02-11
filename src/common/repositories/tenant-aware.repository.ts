@@ -94,6 +94,10 @@ export class TenantAwareRepository<T extends Document> extends BaseRepository<T>
       .exec();
   }
 
+  async findOne(filter: FilterQuery<T>): Promise<T | null> {
+    return this.model.findOne(filter).exec();
+  }
+
   async findWithOptions(
     query: FilterQuery<T>,
     options: {
