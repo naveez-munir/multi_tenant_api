@@ -5,9 +5,13 @@ import { TenantGuard } from '../tenant/guards/tenant.guard';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { Tenant } from '../tenant/schemas/tenant.schema';
 import { User } from './schemas/user.schema';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { IsAllowedToCreateUserGuard } from 'src/common/decorators/is-admin-base-role.decorator';
 
 @Controller('users')
 @UseGuards(TenantGuard)
+@UseGuards(JwtAuthGuard)
+@UseGuards(IsAllowedToCreateUserGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -16,6 +20,7 @@ export class UsersController {
     @CurrentTenant() tenant: Tenant,
     @Req() req: Request
   ) {
+    // console.log('>>>>>>', req)
     return this.usersService.findUsers(
       req['tenantConnection'],
     );
