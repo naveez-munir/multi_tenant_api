@@ -7,11 +7,10 @@ import { Tenant } from '../tenant/schemas/tenant.schema';
 import { User } from './schemas/user.schema';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { IsAllowedToCreateUserGuard } from 'src/common/decorators/is-admin-base-role.decorator';
+import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Controller('users')
-@UseGuards(TenantGuard)
-@UseGuards(JwtAuthGuard)
-@UseGuards(IsAllowedToCreateUserGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, IsAllowedToCreateUserGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -20,7 +19,6 @@ export class UsersController {
     @CurrentTenant() tenant: Tenant,
     @Req() req: Request
   ) {
-    // console.log('>>>>>>', req)
     return this.usersService.findUsers(
       req['tenantConnection'],
     );
@@ -48,10 +46,32 @@ export class UsersController {
     @Req() req: Request,
     @Body() userData: Partial<User>
   ) {
-    return this.usersService.create(
-      req['tenantConnection'],
-      userData
-    );
+    try {
+      const user = await this.usersService.create(
+        req['tenantConnection'],
+        userData
+      );
+
+      // After user creation, update the corresponding entity with the userId
+      const connection = req['tenantConnection'];
+      if (user.role === UserRole.STUDENT) {
+        const studentModel = connection.model('Student');
+        await studentModel.findOneAndUpdate(
+          { cniNumber: user.cnic },
+          { userId: user._id }
+        );
+      } else if (user.role === UserRole.TEACHER) {
+        const teacherModel = connection.model('Teacher');
+        await teacherModel.findOneAndUpdate(
+          { cniNumber: user.cnic },
+          { userId: user._id }
+        );
+      }
+
+      return user;
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 
   @Put(':id')

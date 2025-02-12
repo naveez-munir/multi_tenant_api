@@ -1,17 +1,24 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { UserRole } from '../interfaces/roleEnum';
 
 @Injectable()
 export class IsAllowedToCreateUserGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
-
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
-    const userRole = request.userRole;
+    const user = request.user;
 
-    if (!userRole || !(userRole === UserRole.SUPER_ADMIN || userRole === UserRole.TENANT_ADMIN || userRole === UserRole.ADMIN)) {
-      throw new UnauthorizedException('You do not have permission to create a user.');
+    if (!user || !user.role) {
+      throw new UnauthorizedException('User authentication required');
+    }
+
+    const hasPermission = [
+      UserRole.SUPER_ADMIN,
+      UserRole.TENANT_ADMIN,
+      UserRole.ADMIN
+    ].includes(user.role);
+
+    if (!hasPermission) {
+      throw new UnauthorizedException('You do not have permission to perform this action');
     }
 
     return true;
