@@ -4,11 +4,10 @@ import { BaseEntity } from '../../../common/schemas/base.schema';
 import { UserRole } from 'src/common/interfaces/roleEnum';
 
 @Schema({
-  timestamps: true,
   collection: 'users',
 })
 export class User extends BaseEntity {
-  @Prop({ required: true, unique: true })
+  @Prop({ unique: true })
   email: string;
 
   @Prop({ required: true })
@@ -26,7 +25,7 @@ export class User extends BaseEntity {
   @Prop({
     type: String,
     enum: UserRole,
-    default: UserRole.USER
+    default: UserRole.STUDENT
   })
   role: UserRole;
 }

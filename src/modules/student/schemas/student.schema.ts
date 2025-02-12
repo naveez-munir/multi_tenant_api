@@ -3,7 +3,6 @@ import { Types } from 'mongoose';
 import { BaseUserEntity } from 'src/common/schemas/basicUser.schema';
 
 @Schema({
-  timestamps: true,
   collection: 'students',
 })
 export class Student extends BaseUserEntity {

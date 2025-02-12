@@ -74,4 +74,11 @@ export class UsersService extends BaseService<User> {
     const repository = this.getRepository(connection);
     return repository.toggleField(id, 'isActive');
   }
+
+  async findByIdentifier(connection: Connection, identifier: string) {
+    const repository = this.getRepository(connection);
+    return repository.findOne(
+      { $or: [{ email: identifier }, { cnic: identifier }] }
+    );
+  }
 }
