@@ -26,7 +26,7 @@ export class Student extends BaseUserEntity {
   gradeLevel: string;
 
   @Prop({ type: Types.ObjectId, ref: 'Class' })
-  section?: Types.ObjectId;
+  class?: Types.ObjectId;
 
   @Prop({ unique: true })
   rollNumber?: string;

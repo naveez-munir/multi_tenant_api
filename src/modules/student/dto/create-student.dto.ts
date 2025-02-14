@@ -68,7 +68,7 @@ export class CreateStudentDto {
   @IsOptional()
   @IsMongoId()
   @Transform(({ value }) => (Types.ObjectId.isValid(value) ? new Types.ObjectId(String(value)) : value))
-  section?: Types.ObjectId;
+  class?: Types.ObjectId;
 
 
 

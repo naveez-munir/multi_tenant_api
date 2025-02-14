@@ -5,12 +5,24 @@ import { BaseService } from '../../common/services/base.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { SearchStudentDto } from './dto/search-student.dto';
+import { ClassSchema } from '../class/schemas/class.schema';
 
 @Injectable()
 export class StudentService extends BaseService<Student> {
   constructor() {
     super('Student', StudentSchema);
   }
+
+  private async initializeModels(connection: Connection) {
+      try {
+        // Initialize required models if they don't exist
+        if (!connection.models['Class']) {
+          connection.model('Class', ClassSchema);
+        }
+      } catch (error) {
+        console.error('Model initialization error:', error);
+      }
+    }
 
   async createStudent(
     connection: Connection,
@@ -56,10 +68,14 @@ export class StudentService extends BaseService<Student> {
       if (searchDto.section) {
         query.section = new Types.ObjectId(searchDto.section);
       }
-  
-      return repository.find(query);
+      await this.initializeModels(connection);
+      return repository.findWithOptions(query,{
+        populate:{
+          path: 'class '
+        }
+      });
     } catch (error) {
-      console.log('>>>>>>Error', error)
+      console.log(error)
     }
   }
 
