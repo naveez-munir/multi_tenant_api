@@ -19,6 +19,7 @@ import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { TenantGuard } from '../tenant/guards/tenant.guard';
 import { Tenant } from '../tenant/schemas/tenant.schema';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { PaginationQueryDto } from './dto/pagination-query.dto';
 
 @Controller('subjects')
 @UseGuards(TenantGuard)
@@ -41,7 +42,8 @@ export class SubjectController {
   async findAll(
     @Req() req: Request,
     @Query('subjectName') subjectName?: string,
-    @Query('subjectCode') subjectCode?: string
+    @Query('subjectCode') subjectCode?: string,
+    @Query() paginationQuery?: PaginationQueryDto
   ) {
     const filter = {};
     if (subjectName) filter['subjectName'] = { $regex: subjectName, $options: 'i' };
@@ -49,7 +51,8 @@ export class SubjectController {
 
     return this.subjectService.findSubjects(
       req['tenantConnection'],
-      filter
+      filter,
+      paginationQuery
     );
   }
 

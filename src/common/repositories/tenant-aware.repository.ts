@@ -103,6 +103,7 @@ export class TenantAwareRepository<T extends Document> extends BaseRepository<T>
     options: {
       sort?: any;
       populate?: { path: string; select?: string };
+      pagination?:{page?: number; limit?: number;}
     }
   ): Promise<T[]> {
     let findQuery = this.model.find(query);
@@ -114,7 +115,12 @@ export class TenantAwareRepository<T extends Document> extends BaseRepository<T>
     if (options.sort) {
       findQuery = findQuery.sort(options.sort);
     }
-
-    return findQuery.exec();
+    if (!options.pagination) {
+      return findQuery.exec();
+    }
+    const page = options.pagination.page || 1;
+    const limit = options.pagination.limit || 10;
+    const skip = (page - 1) * limit;
+    return findQuery.skip(skip).limit(limit).exec();
   }
 }

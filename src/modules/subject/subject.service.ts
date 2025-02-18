@@ -4,6 +4,7 @@ import { Subject, SubjectSchema } from './schemas/subject.schema';
 import { BaseService } from 'src/common/services/base.service';
 import { CreateSubjectDto } from './dto/create-subject.dto';
 import { UpdateSubjectDto } from './dto/update-subject.dto';
+import { PaginationQueryDto } from './dto/pagination-query.dto';
 
 @Injectable()
 export class SubjectService extends BaseService<Subject> {
@@ -28,10 +29,25 @@ export class SubjectService extends BaseService<Subject> {
 
   async findSubjects(
     connection: Connection,
-    filter: { name?: string; subjectCode?: string } = {}
-  ) {
+    filter: { name?: string; subjectCode?: string } = {},
+    paginationQuery?: PaginationQueryDto
+  ){
     const repository = this.getRepository(connection);
-    return repository.find(filter);
+
+    const searchQuery: Record<string, any> = {};
+    if (filter.name) {
+      searchQuery.name = { $regex: new RegExp(filter.name, 'i') };
+    }
+    if (filter.subjectCode) {
+      searchQuery.subjectCode = { $regex: new RegExp(filter.subjectCode, 'i') };
+    }
+    return repository.findWithOptions(searchQuery, {
+      sort: { createdAt: -1 },
+      pagination: {
+        page: paginationQuery?.page || 1,
+        limit: paginationQuery?.limit || 10
+      }
+    });
   }
 
   async findById(
