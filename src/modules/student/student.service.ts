@@ -6,6 +6,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { SearchStudentDto } from './dto/search-student.dto';
 import { ClassSchema } from '../class/schemas/class.schema';
+import { StudentListResponseDto } from './dto/student-list-response.dto';
 
 @Injectable()
 export class StudentService extends BaseService<Student> {
@@ -14,24 +15,30 @@ export class StudentService extends BaseService<Student> {
   }
 
   private async initializeModels(connection: Connection) {
-      try {
-        // Initialize required models if they don't exist
-        if (!connection.models['Class']) {
-          connection.model('Class', ClassSchema);
-        }
-      } catch (error) {
-        console.error('Model initialization error:', error);
+    try {
+      if (!connection.models['Class']) {
+        connection.model('Class', ClassSchema);
       }
+    } catch (error) {
+      console.error('Model initialization error:', error);
     }
+  }
 
   async createStudent(
     connection: Connection,
     createDto: CreateStudentDto
-  ) {
+  ): Promise<StudentListResponseDto> {
     try {
       const repository = this.getRepository(connection);
-      const result = await repository.create(createDto);
-      return result;
+      await this.initializeModels(connection);
+      
+      const student = await repository.create(createDto);
+      const populatedStudent = await repository.findWithOptions(
+        { _id: student._id },
+        { populate: { path: 'class', select: 'className' } }
+      );
+
+      return StudentListResponseDto.fromEntity(populatedStudent[0]);
     } catch (error) {
       console.error('Error creating student:', error);
       throw error;
@@ -41,12 +48,11 @@ export class StudentService extends BaseService<Student> {
   async searchStudents(
     connection: Connection,
     searchDto: SearchStudentDto
-  ): Promise<Student[]> {
+  ): Promise<StudentListResponseDto[]> {
     try {
       const repository = this.getRepository(connection);
       const query: any = {};
-  
-      // Build query based on search criteria
+
       if (searchDto.firstName) {
         query.firstName = { $regex: searchDto.firstName, $options: 'i' };
       }
@@ -68,14 +74,21 @@ export class StudentService extends BaseService<Student> {
       if (searchDto.section) {
         query.section = new Types.ObjectId(searchDto.section);
       }
+  
       await this.initializeModels(connection);
-      return repository.findWithOptions(query,{
-        populate:{
-          path: 'class '
-        }
+      
+      const students = await repository.findWithOptions(query, {
+        populate: {
+          path: 'class',
+          select: 'className'
+        },
+        sort: { gradeLevel: 1, firstName: 1, lastName: 1 }
       });
+
+      return students.map(student => StudentListResponseDto.fromEntity(student));
     } catch (error) {
-      console.log(error)
+      console.log(error);
+      throw error;
     }
   }
 
@@ -83,39 +96,64 @@ export class StudentService extends BaseService<Student> {
     connection: Connection,
     id: string,
     updateDto: UpdateStudentDto
-  ): Promise<Student | null> {
+  ): Promise<StudentListResponseDto> {
+    await this.initializeModels(connection);
     const repository = this.getRepository(connection);
-    return repository.findByIdAndUpdate(id, updateDto);
+    
+    await repository.findByIdAndUpdate(id, updateDto);
+    
+    const updatedStudent = await repository.findWithOptions(
+      { _id: new Types.ObjectId(id) },
+      { populate: { path: 'class', select: 'className' } }
+    );
+
+    return StudentListResponseDto.fromEntity(updatedStudent[0]);
   }
 
   async addDocument(
     connection: Connection,
     studentId: string,
     document: { documentType: string; documentUrl: string }
-  ): Promise<Student | null> {
+  ): Promise<StudentListResponseDto> {
     const repository = this.getRepository(connection);
     const student = await repository.findById(studentId);
-    if (!student) return null;
+    if (!student) throw new Error('Student not found');
+    
     const documents = student.documents || [];
     documents.push({ ...document, uploadDate: new Date() });
 
-    return repository.findByIdAndUpdate(studentId, { documents });
+    await repository.findByIdAndUpdate(studentId, { documents });
+    
+    const updatedStudent = await repository.findWithOptions(
+      { _id: new Types.ObjectId(studentId) },
+      { populate: { path: 'class', select: 'className' } }
+    );
+
+    return StudentListResponseDto.fromEntity(updatedStudent[0]);
   }
 
   async updateAttendance(
     connection: Connection,
     studentId: string,
     percentage: number
-  ): Promise<Student | null> {
+  ): Promise<StudentListResponseDto> {
     const repository = this.getRepository(connection);
-    return repository.findByIdAndUpdate(studentId, { attendancePercentage: percentage });
+    await repository.findByIdAndUpdate(studentId, { attendancePercentage: percentage });
+    
+    const updatedStudent = await repository.findWithOptions(
+      { _id: new Types.ObjectId(studentId) },
+      { populate: { path: 'class', select: 'className' } }
+    );
+
+    return StudentListResponseDto.fromEntity(updatedStudent[0]);
   }
 
   async getStudentsByClass(
     connection: Connection,
     gradeLevel: string,
     sectionId?: string
-  ): Promise<Student[]> {
+  ): Promise<StudentListResponseDto[]> {
+    await this.initializeModels(connection);
     const repository = this.getRepository(connection);
     const query: any = { gradeLevel };
     
@@ -123,15 +161,36 @@ export class StudentService extends BaseService<Student> {
       query.section = new Types.ObjectId(sectionId);
     }
 
-    return repository.find(query);
+    const students = await repository.findWithOptions(query, {
+      populate: {
+        path: 'class',
+        select: 'className'
+      },
+      sort: { firstName: 1, lastName: 1 }
+    });
+
+    return students.map(student => StudentListResponseDto.fromEntity(student));
   }
 
   async getStudentsByGuardianCnic(
     connection: Connection,
     guardianCnic: string
-  ): Promise<Student[]> {
+  ): Promise<StudentListResponseDto[]> {
+    await this.initializeModels(connection);
     const repository = this.getRepository(connection);
-    return repository.find({ 'guardian.cniNumber': guardianCnic });
+    
+    const students = await repository.findWithOptions(
+      { 'guardian.cniNumber': guardianCnic },
+      {
+        populate: {
+          path: 'class',
+          select: 'className'
+        },
+        sort: { firstName: 1, lastName: 1 }
+      }
+    );
+
+    return students.map(student => StudentListResponseDto.fromEntity(student));
   }
 
   async updateStudentStatus(
@@ -143,7 +202,7 @@ export class StudentService extends BaseService<Student> {
       exitDate: Date;
       exitRemarks?: string;
     }
-  ): Promise<Student | null> {
+  ): Promise<StudentListResponseDto> {
     const repository = this.getRepository(connection);
     const updateData: any = { status };
 
@@ -151,6 +210,43 @@ export class StudentService extends BaseService<Student> {
       Object.assign(updateData, exitDetails);
     }
 
-    return repository.findByIdAndUpdate(studentId, updateData);
+    await repository.findByIdAndUpdate(studentId, updateData);
+    
+    const updatedStudent = await repository.findWithOptions(
+      { _id: new Types.ObjectId(studentId) },
+      { populate: { path: 'class', select: 'className' } }
+    );
+
+    return StudentListResponseDto.fromEntity(updatedStudent[0]);
+  }
+
+  // Keep getById with full student details
+  async findById(
+    connection: Connection,
+    id: string
+  ): Promise<Student | null> {
+    try {
+      await this.initializeModels(connection);
+      const repository = this.getRepository(connection);
+      
+      const students = await repository.findWithOptions(
+        { _id: new Types.ObjectId(id) },
+        {
+          populate: {
+            path: 'class',
+            select: 'className section classGradeLevel classTeacher classTempTeacher classSubjects'
+          }
+        }
+      );
+  
+      if (!students || students.length === 0) {
+        return null;
+      }
+  
+      return students[0];
+    } catch (error) {
+      console.error('Error finding student by ID:', error);
+      throw error;
+    }
   }
 }
