@@ -48,6 +48,20 @@ export class ClassService extends BaseService<Class> {
     }
   }
 
+  private cleanClassData(data: CreateClassDto | UpdateClassDto) {
+    const cleanedData = { ...data };
+    if (data.classSection.trim() === '') {
+      delete cleanedData.classSection;
+    }
+    if (!data.classTeacher || data.classTeacher.toString() === '') {
+      delete cleanedData.classTeacher;
+    }
+    if (!data.classTempTeacher || data.classTempTeacher.toString() === '') {
+      delete cleanedData.classTempTeacher;
+    }
+    return cleanedData;
+  }
+
   async createClass(
     connection: Connection,
     createDto: CreateClassDto
@@ -56,24 +70,14 @@ export class ClassService extends BaseService<Class> {
       await this.makeConnection(connection);
       const repository = this.getRepository(connection);
 
-      if (createDto.classTeacher) {
-        await this.checkTeacherAssignment(repository, createDto.classTeacher.toString());
+      // Clean the data before processing
+      const cleanedData = this.cleanClassData(createDto);
+
+      if (cleanedData.classTeacher) {
+        await this.checkTeacherAssignment(repository, cleanedData.classTeacher.toString());
       }
 
-      const classData: Partial<Class> = {
-        ...createDto,
-        ...(createDto.classTeacher && {
-          classTeacher: new Types.ObjectId(createDto.classTeacher)
-        }),
-        ...(createDto.classTempTeacher && {
-          classTempTeacher: new Types.ObjectId(createDto.classTempTeacher)
-        }),
-        ...(createDto.classSubjects && {
-          classSubjects: createDto.classSubjects.map(id => new Types.ObjectId(id))
-        })
-      };
-
-      const newClass = await repository.create(classData);
+      const newClass = await repository.create(cleanedData);
       const populatedClass = await repository.findWithOptions(
         { _id: newClass._id },
         {
@@ -140,28 +144,15 @@ export class ClassService extends BaseService<Class> {
     try {
       await this.makeConnection(connection);
       const repository = this.getRepository(connection);
-  
-      if (updateDto.classTeacher) {
-        await this.checkTeacherAssignment(repository, updateDto.classTeacher.toString(), id);
+
+      // Clean the data before processing
+      const cleanedData = this.cleanClassData(updateDto);
+
+      if (cleanedData.classTeacher) {
+        await this.checkTeacherAssignment(repository, cleanedData.classTeacher.toString(), id);
       }
-  
-      // Clean up the updateDto to handle empty strings
-      const updateData: Partial<Class> = {
-        ...updateDto,
-        classTeacher: updateDto.classTeacher ? new Types.ObjectId(updateDto.classTeacher) : undefined,
-        classTempTeacher: updateDto.classTempTeacher ? new Types.ObjectId(updateDto.classTempTeacher) : undefined,
-        classSubjects: updateDto.classSubjects?.length ? 
-          updateDto.classSubjects.map(id => new Types.ObjectId(id)) : 
-          undefined
-      };
-      // Remove undefined or empty string fields
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key] === undefined || updateData[key] === '') {
-          delete updateData[key];
-        }
-      });
-  
-      await repository.findByIdAndUpdate(id, updateData);
+
+      await repository.findByIdAndUpdate(id, cleanedData);
       
       const updatedClass = await repository.findWithOptions(
         { _id: new Types.ObjectId(id) },

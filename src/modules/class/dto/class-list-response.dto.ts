@@ -13,7 +13,7 @@ export class ClassListResponseDto {
       className: classData.className,
       classSection: classData.classSection || '',
       classGradeLevel: classData.classGradeLevel || '',
-      teacherName: `${classData.classTeacher?.firstName} ${classData.classTeacher?.lastName}` || '',
+      teacherName: `${classData.classTeacher?.firstName || ''} ${classData.classTeacher?.lastName || ''}` || '',
       tempTeacherName: `${classData.classTempTeacher?.firstName || ''} ${classData.classTempTeacher?.lastName || ''}` || '',
       subjectCount: classData.classSubjects?.length || 0
     };
