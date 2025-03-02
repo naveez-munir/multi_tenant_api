@@ -21,6 +21,7 @@ import { DiaryQueryDto } from "./dto/diary-query.dto";
 import { UpdateDailyDiaryDto } from "./dto/update-daily-diary.dto";
 import { AttachmentDto } from "./dto/attachment.dto";
 import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";
+import { Request } from "express";
 
 @Controller('daily-diary')
 @UseGuards(JwtAuthGuard, TenantGuard)

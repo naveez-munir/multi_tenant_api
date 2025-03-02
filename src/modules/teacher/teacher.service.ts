@@ -1,9 +1,11 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Connection, Types } from 'mongoose';
 import { Teacher, TeacherSchema } from './schemas/teacher.schema';
 import { BaseService } from '../../common/services/base.service';
-import { CreateTeacherDto } from './dto/create-teacher.dto';
+import { CreateTeacherDto, DocumentDto, EducationHistoryDto, ExperienceDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
+import { TeacherListResponseDto } from './dto/teacher-list-response.dto';
+import { ClassSchema } from '../class/schemas/class.schema';
 import { SearchTeacherDto } from './dto/search-student.dto';
 
 @Injectable()
@@ -12,20 +14,52 @@ export class TeacherService extends BaseService<Teacher> {
     super('Teacher', TeacherSchema);
   }
 
-  // ✅ Create a Teacher in the Tenant-Specific Database
-  async createTeacher(connection: Connection, createDto: CreateTeacherDto): Promise<Teacher> {
+  private async initializeModels(connection: Connection): Promise<void> {
     try {
+      if (!connection.models['Class']) {
+        connection.model('Class', ClassSchema);
+      }
+    } catch (error) {
+      // Model already exists, ignore error
+    }
+  }
+
+  private validateObjectId(id: string, fieldName: string): void {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException(`Invalid ${fieldName} ID format`);
+    }
+  }
+
+  async createTeacher(
+    connection: Connection, 
+    createDto: CreateTeacherDto
+  ): Promise<TeacherListResponseDto> {
+    try {
+      await this.initializeModels(connection);
       const repository = this.getRepository(connection);
 
-      // Convert ObjectId fields
-      if (createDto.classTeacherOf && typeof createDto.classTeacherOf === 'string') {
-        createDto.classTeacherOf = new Types.ObjectId(createDto.classTeacherOf);
-      }
-      if (createDto.userId && typeof createDto.userId === 'string') {
-        createDto.userId = new Types.ObjectId(createDto.userId);
-      }
+      const teacherData = {
+        ...createDto,
+        ...(createDto.classTeacherOf && {
+          classTeacherOf: new Types.ObjectId(createDto.classTeacherOf.toString())
+        }),
+        ...(createDto.userId && {
+          userId: new Types.ObjectId(createDto.userId.toString())
+        })
+      };
 
-      return await repository.create(createDto);
+      const newTeacher = await repository.create(teacherData);
+      const populatedTeacher = await repository.findWithOptions(
+        { _id: newTeacher._id },
+        {
+          populate: {
+            path: 'classTeacherOf',
+            select: 'className'
+          }
+        }
+      );
+
+      return TeacherListResponseDto.fromEntity(populatedTeacher[0]);
     } catch (error) {
       if (error.code === 11000) {
         throw new ConflictException('A teacher with this CNI Number or Email already exists');
@@ -34,11 +68,14 @@ export class TeacherService extends BaseService<Teacher> {
     }
   }
 
-  // ✅ Search Teachers with Filters
-  async searchTeachers(connection: Connection, searchDto: SearchTeacherDto): Promise<Teacher[]> {
+  async searchTeachers(
+    connection: Connection, 
+    searchDto: SearchTeacherDto
+  ) {
     try {
+      await this.initializeModels(connection);
       const repository = this.getRepository(connection);
-      const query: any = {};
+      const query: Record<string, any> = {};
 
       if (searchDto.firstName) {
         query.firstName = { $regex: searchDto.firstName, $options: 'i' };
@@ -53,104 +90,319 @@ export class TeacherService extends BaseService<Teacher> {
         query.employmentStatus = searchDto.employmentStatus;
       }
       if (searchDto.classTeacherOf) {
+        this.validateObjectId(searchDto.classTeacherOf, 'class');
         query.classTeacherOf = new Types.ObjectId(searchDto.classTeacherOf);
       }
       if (searchDto.qualification) {
         query.qualifications = { $regex: searchDto.qualification, $options: 'i' };
       }
+      if (searchDto.gender) {
+        query.gender = searchDto.gender;
+      }
 
-      return repository.find(query);
+      const teachers = await repository.findWithOptions(query, {
+        populate: {
+          path: 'classTeacherOf',
+          select: 'className'
+        },
+        sort: { firstName: 1, lastName: 1 }
+      });
+      return teachers.map(teacher => TeacherListResponseDto.fromEntity(teacher));
     } catch (error) {
-      console.error('Error searching teachers:', error);
-      throw error;
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to search teachers');
     }
   }
 
-  // ✅ Update a Teacher by ID
+  async findById(
+    connection: Connection,
+    id: string
+  ): Promise<Teacher> {
+    try {
+      this.validateObjectId(id, 'teacher');
+      await this.initializeModels(connection);
+      const repository = this.getRepository(connection);
+
+      const teacher = await repository.findWithOptions(
+        { _id: new Types.ObjectId(id) },
+        {
+          populate: {
+            path: 'classTeacherOf userId',
+            select: 'className email'
+          }
+        }
+      );
+
+      if (!teacher || !teacher.length) {
+        throw new NotFoundException('Teacher not found');
+      }
+
+      return teacher[0];
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to fetch teacher');
+    }
+  }
+
   async updateTeacherById(
     connection: Connection,
     id: string,
     updateDto: UpdateTeacherDto
-  ): Promise<Teacher | null> {
-    const repository = this.getRepository(connection);
-    return repository.findByIdAndUpdate(id, updateDto);
-  }
+  ): Promise<TeacherListResponseDto> {
+    try {
+      this.validateObjectId(id, 'teacher');
+      await this.initializeModels(connection);
+      const repository = this.getRepository(connection);
+      const updateData = {
+        ...updateDto,
+        ...(updateDto.classTeacherOf && {
+          classTeacherOf: new Types.ObjectId(updateDto.classTeacherOf._id.toString())
+        }),
+        ...(updateDto.userId && {
+          userId: new Types.ObjectId(updateDto.userId.toString())
+        })
+      };
 
-  // ✅ Assign a Teacher to a Class
-  async assignTeacherToClass(connection: Connection, teacherId: string, classId: string): Promise<Teacher | null> {
-    const repository = this.getRepository(connection);
-    const teacherObjectId = new Types.ObjectId(teacherId);
-    const classObjectId = new Types.ObjectId(classId);
+      await repository.findByIdAndUpdate(id, updateData);
 
-    const existingClassTeacher = await repository.find({ classTeacherOf: classObjectId });
-    if (existingClassTeacher.length > 0) {
-      throw new ConflictException('This class already has a teacher assigned');
+      const updatedTeacher = await repository.findWithOptions(
+        { _id: new Types.ObjectId(id) },
+        {
+          populate: {
+            path: 'classTeacherOf',
+            select: 'className'
+          }
+        }
+      );
+
+      if (!updatedTeacher || !updatedTeacher.length) {
+        throw new NotFoundException('Teacher not found');
+      }
+
+      return TeacherListResponseDto.fromEntity(updatedTeacher[0]);
+    } catch (error) {
+      console.log(error)
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to update teacher');
     }
-
-    return repository.findByIdAndUpdate(teacherId, { classTeacherOf: classObjectId });
   }
 
-  // ✅ Add an Education History Entry
+  async assignTeacherToClass(
+    connection: Connection,
+    teacherId: string,
+    classId: string
+  ): Promise<TeacherListResponseDto> {
+    try {
+      this.validateObjectId(teacherId, 'teacher');
+      this.validateObjectId(classId, 'class');
+      
+      await this.initializeModels(connection);
+      const repository = this.getRepository(connection);
+
+      const existingClassTeacher = await repository.findOne({ 
+        classTeacherOf: new Types.ObjectId(classId) 
+      });
+
+      if (existingClassTeacher) {
+        throw new ConflictException('This class already has a teacher assigned');
+      }
+
+      await repository.findByIdAndUpdate(teacherId, { 
+        classTeacherOf: new Types.ObjectId(classId) 
+      });
+
+      const updatedTeacher = await repository.findWithOptions(
+        { _id: new Types.ObjectId(teacherId) },
+        {
+          populate: {
+            path: 'classTeacherOf',
+            select: 'className'
+          }
+        }
+      );
+
+      return TeacherListResponseDto.fromEntity(updatedTeacher[0]);
+    } catch (error) {
+      if (error instanceof ConflictException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to assign teacher to class');
+    }
+  }
+
   async addEducationHistory(
     connection: Connection,
     teacherId: string,
-    education: { degree: string; institution: string; year: number; certificateUrl?: string }
-  ): Promise<Teacher | null> {
-    const repository = this.getRepository(connection);
-    const teacher = await repository.findById(teacherId);
-    if (!teacher) return null;
+    education: EducationHistoryDto
+  ): Promise<TeacherListResponseDto> {
+    try {
+      this.validateObjectId(teacherId, 'teacher');
+      const repository = this.getRepository(connection);
+      
+      const teacher = await repository.findById(teacherId);
+      if (!teacher) {
+        throw new NotFoundException('Teacher not found');
+      }
 
-    const educationHistory = teacher.educationHistory || [];
-    educationHistory.push(education);
+      const educationHistory = teacher.educationHistory || [];
+      educationHistory.push(education);
 
-    return repository.findByIdAndUpdate(teacherId, { educationHistory });
+      await repository.findByIdAndUpdate(teacherId, { educationHistory });
+
+      const updatedTeacher = await repository.findWithOptions(
+        { _id: new Types.ObjectId(teacherId) },
+        {
+          populate: {
+            path: 'classTeacherOf',
+            select: 'className'
+          }
+        }
+      );
+
+      return TeacherListResponseDto.fromEntity(updatedTeacher[0]);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to add education history');
+    }
   }
 
-  // ✅ Add an Experience Entry
   async addExperience(
     connection: Connection,
     teacherId: string,
-    experience: { institution: string; position: string; fromDate: Date; toDate?: Date; description?: string; experienceLatterUrl?: string }
-  ): Promise<Teacher | null> {
-    const repository = this.getRepository(connection);
-    const teacher = await repository.findById(teacherId);
-    if (!teacher) return null;
+    experience: ExperienceDto
+  ): Promise<TeacherListResponseDto> {
+    try {
+      this.validateObjectId(teacherId, 'teacher');
+      const repository = this.getRepository(connection);
+      
+      const teacher = await repository.findById(teacherId);
+      if (!teacher) {
+        throw new NotFoundException('Teacher not found');
+      }
 
-    const experienceList = teacher.experience || [];
-    experienceList.push(experience);
+      const experienceList = teacher.experience || [];
+      experienceList.push(experience);
 
-    return repository.findByIdAndUpdate(teacherId, { experience: experienceList });
+      await repository.findByIdAndUpdate(teacherId, { experience: experienceList });
+
+      const updatedTeacher = await repository.findWithOptions(
+        { _id: new Types.ObjectId(teacherId) },
+        {
+          populate: {
+            path: 'classTeacherOf',
+            select: 'className'
+          }
+        }
+      );
+
+      return TeacherListResponseDto.fromEntity(updatedTeacher[0]);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to add experience');
+    }
   }
 
-  // ✅ Add a Document (e.g., CNIC Image)
   async addDocument(
     connection: Connection,
     teacherId: string,
-    document: { documentType: string; documentUrl: string }
-  ): Promise<Teacher | null> {
-    const repository = this.getRepository(connection);
-    const teacher = await repository.findById(teacherId);
-    if (!teacher) return null;
+    document: DocumentDto
+  ): Promise<TeacherListResponseDto> {
+    try {
+      this.validateObjectId(teacherId, 'teacher');
+      const repository = this.getRepository(connection);
+      
+      const teacher = await repository.findById(teacherId);
+      if (!teacher) {
+        throw new NotFoundException('Teacher not found');
+      }
 
-    const documents = teacher.documents || [];
-    documents.push({ ...document, uploadDate: new Date() });
+      const documents = teacher.documents || [];
+      documents.push({ ...document, uploadDate: new Date() });
 
-    return repository.findByIdAndUpdate(teacherId, { documents });
+      await repository.findByIdAndUpdate(teacherId, { documents });
+
+      const updatedTeacher = await repository.findWithOptions(
+        { _id: new Types.ObjectId(teacherId) },
+        {
+          populate: {
+            path: 'classTeacherOf',
+            select: 'className'
+          }
+        }
+      );
+
+      return TeacherListResponseDto.fromEntity(updatedTeacher[0]);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to add document');
+    }
   }
 
-  // ✅ Update Teacher Employment Status
   async updateTeacherStatus(
     connection: Connection,
     teacherId: string,
     employmentStatus: string
-  ): Promise<Teacher | null> {
-    const repository = this.getRepository(connection);
-    return repository.findByIdAndUpdate(teacherId, { employmentStatus });
+  ): Promise<TeacherListResponseDto> {
+    try {
+      this.validateObjectId(teacherId, 'teacher');
+      const repository = this.getRepository(connection);
+
+      await repository.findByIdAndUpdate(teacherId, { employmentStatus });
+
+      const updatedTeacher = await repository.findWithOptions(
+        { _id: new Types.ObjectId(teacherId) },
+        {
+          populate: {
+            path: 'classTeacherOf',
+            select: 'className'
+          }
+        }
+      );
+
+      if (!updatedTeacher || !updatedTeacher.length) {
+        throw new NotFoundException('Teacher not found');
+      }
+
+      return TeacherListResponseDto.fromEntity(updatedTeacher[0]);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to update teacher status');
+    }
   }
 
-  // ✅ Remove a Teacher by ID
-  async deleteTeacher(connection: Connection, teacherId: string): Promise<boolean> {
-    const repository = this.getRepository(connection);
-    return repository.delete(teacherId);
+  async deleteTeacher(
+    connection: Connection,
+    teacherId: string
+  ): Promise<boolean> {
+    try {
+      this.validateObjectId(teacherId, 'teacher');
+      const repository = this.getRepository(connection);
+      
+      const result = await repository.delete(teacherId);
+      if (!result) {
+        throw new NotFoundException('Teacher not found');
+      }
+
+      return true;
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to delete teacher');
+    }
   }
 }

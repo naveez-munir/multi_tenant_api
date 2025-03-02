@@ -16,6 +16,7 @@ import { AttachmentDto } from './dto/attachment.dto';
 import { SubjectSchema } from '../subject/schemas/subject.schema';
 import { ClassSchema } from '../class/schemas/class.schema';
 import { TeacherSchema } from '../teacher/schemas/teacher.schema';
+import { DailyDiaryResponseDto } from './dto/response.dto';
 //TODO need to add the support the dairy should be added by teacher no other user
 //TODO also format the response , no need to send extra data
 
@@ -40,7 +41,7 @@ export class DailyDiaryService extends BaseService<DailyDiary> {
   async findAll(
     connection: Connection,
     query: DiaryQueryDto
-  ): Promise<DailyDiary[]> {
+  ): Promise<DailyDiaryResponseDto[]> {
     await this.makeConnection(connection);
     const repository = this.getRepository(connection);
     const filter: any = {};
@@ -61,15 +62,14 @@ export class DailyDiaryService extends BaseService<DailyDiary> {
       },
       sort: { date: -1 }
     });
-
-    return entries;
+    return entries.map(dairy => DailyDiaryResponseDto.fromEntity(dairy));
   }
 
   async createDiaryEntry(
     connection: Connection,
     createDto: CreateDailyDiaryDto,
     teacherId: string
-  ): Promise<DailyDiary> {
+  ): Promise<DailyDiaryResponseDto> {
     if (!Types.ObjectId.isValid(createDto.classId)) {
       throw new BadRequestException('Invalid class ID');
     }
@@ -168,7 +168,7 @@ export class DailyDiaryService extends BaseService<DailyDiary> {
   async getDiaryEntry(
     connection: Connection,
     id: string
-  ): Promise<DailyDiary> {
+  ): Promise<DailyDiaryResponseDto> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid diary entry ID');
     }
@@ -188,7 +188,7 @@ export class DailyDiaryService extends BaseService<DailyDiary> {
       throw new NotFoundException('Diary entry not found');
     }
 
-    return entries[0];
+    return DailyDiaryResponseDto.fromEntity(entries[0]);
   }
 
   async updateDiaryEntry(
@@ -196,7 +196,7 @@ export class DailyDiaryService extends BaseService<DailyDiary> {
     id: string,
     updateDto: UpdateDailyDiaryDto,
     teacherId: string
-  ): Promise<DailyDiary> {
+  ): Promise<DailyDiaryResponseDto> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid diary entry ID');
     }
@@ -273,7 +273,7 @@ export class DailyDiaryService extends BaseService<DailyDiary> {
     diaryId: string,
     attachment: AttachmentDto,
     teacherId: string
-  ): Promise<DailyDiary> {
+  ): Promise<DailyDiaryResponseDto> {
     if (!Types.ObjectId.isValid(diaryId)) {
       throw new BadRequestException('Invalid diary entry ID');
     }
@@ -304,7 +304,7 @@ export class DailyDiaryService extends BaseService<DailyDiary> {
     diaryId: string,
     attachmentId: string,
     teacherId: string
-  ): Promise<DailyDiary> {
+  ): Promise<DailyDiaryResponseDto> {
     if (!Types.ObjectId.isValid(diaryId)) {
       throw new BadRequestException('Invalid diary entry ID');
     }
