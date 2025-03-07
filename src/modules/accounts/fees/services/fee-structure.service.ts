@@ -18,40 +18,44 @@ export class FeeStructureService extends BaseService<FeeStructure> {
     connection: Connection,
     createDto: CreateFeeStructureDto
   ): Promise<FeeStructure> {
-    const repository = this.getRepository(connection);
-
-    if (!this.isValidObjectId(createDto.classId)) {
-      throw new BadRequestException(`Invalid classId format: ${createDto.classId}`);
-    }
-
-    for (const component of createDto.feeComponents) {
-      if (!this.isValidObjectId(component.feeCategory)) {
-        throw new BadRequestException(`Invalid feeCategory format: ${component.feeCategory}`);
-      }
-    }
-
-    const validationData: ValidateFeeStructureInput = {
-      academicYear: createDto.academicYear,
-      classId: createDto.classId,
-      feeComponents: createDto.feeComponents.map(component => ({
-        ...component,
-        feeCategory: Types.ObjectId.createFromHexString(component.feeCategory)
-      }))
-    };
-    
-    await this.validateNewFeeStructure(connection, validationData);
-    await this.validateFeeCategories(connection, createDto.feeComponents);
+    try {
+      const repository = this.getRepository(connection);
   
-    const feeStructure = await repository.create({
-      ...createDto,
-      classId: Types.ObjectId.createFromHexString(createDto.classId),
-      feeComponents: createDto.feeComponents.map(component => ({
-        ...component,
-        feeCategory: Types.ObjectId.createFromHexString(component.feeCategory)
-      }))
-    });
-
-    return feeStructure
+      if (!this.isValidObjectId(createDto.classId)) {
+        throw new BadRequestException(`Invalid classId format: ${createDto.classId}`);
+      }
+  
+      for (const component of createDto.feeComponents) {
+        if (!this.isValidObjectId(component.feeCategory)) {
+          throw new BadRequestException(`Invalid feeCategory format: ${component.feeCategory}`);
+        }
+      }
+  
+      const validationData: ValidateFeeStructureInput = {
+        academicYear: createDto.academicYear,
+        classId: createDto.classId,
+        feeComponents: createDto.feeComponents.map(component => ({
+          ...component,
+          feeCategory: Types.ObjectId.createFromHexString(component.feeCategory)
+        }))
+      };
+      
+      await this.validateNewFeeStructure(connection, validationData);
+      await this.validateFeeCategories(connection, createDto.feeComponents);
+    
+      const feeStructure = await repository.create({
+        ...createDto,
+        classId: Types.ObjectId.createFromHexString(createDto.classId),
+        feeComponents: createDto.feeComponents.map(component => ({
+          ...component,
+          feeCategory: Types.ObjectId.createFromHexString(component.feeCategory)
+        }))
+      });
+  
+      return feeStructure
+    } catch (error) {
+      console.log('>>>>>',error)
+    }
   }
 
   async getFeeStructures(
