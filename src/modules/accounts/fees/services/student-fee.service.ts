@@ -366,24 +366,37 @@ export class StudentFeeService extends BaseService<StudentFee> {
 
   async getPendingFees(
     connection: Connection,
-    query: { academicYear?: string; classId?: string }
+    query: { academicYear?: string; classId?: string; month?: number }
   ): Promise<{ fees: StudentFee[], summary: any }> {
     try {
       const repository = this.getRepository(connection);
       const filter: Record<string, any> = {
         status: { $in: ['PENDING', 'PARTIAL'] }
       };
-  
+
+      const today = new Date();
+      const currentMonth = today.getMonth() + 1;
+
+      if (!query.academicYear && !query.classId && !query.month) {
+        query.month = currentMonth;
+      }
+
       if (query.academicYear) filter.academicYear = query.academicYear;
-      
+
+      if (query.month) {
+        if (query.month < 1 || query.month > 12) {
+          throw new BadRequestException(`Invalid month: ${query.month}. Month must be between 1 and 12.`);
+        }
+        filter.billMonth = query.month;
+      }
       if (query.classId) {
         if (!Types.ObjectId.isValid(query.classId)) {
           throw new BadRequestException(`Invalid classId: ${query.classId}`);
         }
-        
+        console.log(Types.ObjectId.createFromHexString(query.classId) )
         const studentRepo = connection.model('Student', StudentSchema);
         const students = await studentRepo.find({ 
-          classId: Types.ObjectId.createFromHexString(query.classId) 
+          class: query.classId
         });
         
         if (students.length === 0) {
@@ -395,13 +408,11 @@ export class StudentFeeService extends BaseService<StudentFee> {
         
         filter.studentId = { $in: students.map(s => s._id) };
       }
-  
+
       const fees = await repository.findWithOptions(filter, {
         sort: { dueDate: 1 }
       });
-      
-      const today = new Date();
-  
+
       return {
         fees,
         summary: {
@@ -437,7 +448,7 @@ export class StudentFeeService extends BaseService<StudentFee> {
         
         const studentRepo = connection.model('Student', StudentSchema);
         const students = await studentRepo.find({ 
-          classId: Types.ObjectId.createFromHexString(query.classId) 
+          class: query.classId
         });
         
         if (students.length === 0) {

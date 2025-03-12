@@ -56,7 +56,7 @@ export class StudentFeeController {
   @Get('pending')
   async getPendingFees(
     @Req() req: Request,
-    @Query() query: { academicYear?: string; classId?: string }
+    @Query() query: { academicYear?: string; classId?: string; month?: number; }
   ) {
     return this.studentFeeService.getPendingFees(
       req['tenantConnection'],
