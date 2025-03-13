@@ -38,6 +38,14 @@ export class FeeComponentDto {
   @IsBoolean()
   @IsOptional()
   discountAllowed?: boolean;
+
+  @IsString()
+  @IsOptional()
+  createdBy?: string;
+
+  @IsString()
+  @IsOptional()
+  updatedBy?: string;
 }
 
 export class CreateFeeStructureDto {

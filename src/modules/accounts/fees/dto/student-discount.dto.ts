@@ -1,6 +1,8 @@
 import { PartialType } from "@nestjs/mapped-types";
 import { IsMongoId, IsEnum, IsNumber, Min, Max, IsArray, IsOptional, IsDate, IsString } from "class-validator";
 import { DiscountType, ValueType } from "../../enums/studentFeeEnums";
+import { Transform } from "class-transformer";
+import { Types } from "mongoose";
 
 export class CreateStudentDiscountDto {
   @IsMongoId()
@@ -32,6 +34,15 @@ export class CreateStudentDiscountDto {
   @IsString()
   @IsOptional()
   remarks?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value ? new Types.ObjectId(String(value)) : undefined)
+  createdBy?: Types.ObjectId;
+
+  @IsOptional()
+  @Transform(({ value }) => value ? new Types.ObjectId(String(value)) : undefined)
+  updatedBy?: Types.ObjectId;
+
 }
 
 export class UpdateStudentDiscountDto extends PartialType(CreateStudentDiscountDto) {}

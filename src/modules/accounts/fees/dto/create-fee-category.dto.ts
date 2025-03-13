@@ -17,6 +17,14 @@ export class CreateFeeCategoryDto {
 
   @IsString()
   @IsOptional()
+  createdBy?: string;
+
+  @IsString()
+  @IsOptional()
+  updatedBy?: string;
+
+  @IsString()
+  @IsOptional()
   description?: string;
 }
 

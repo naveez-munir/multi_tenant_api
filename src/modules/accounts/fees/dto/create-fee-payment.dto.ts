@@ -76,6 +76,7 @@ export class CreateFeePaymentDto {
   @IsOptional()
   remarks?: string;
 }
+//TODO we can add the created and updated from the client for this
 
 export class BulkFeePaymentDto {
   @IsArray()
