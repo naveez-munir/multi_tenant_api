@@ -10,7 +10,9 @@ import {
   UseGuards,
   Req,
   NotFoundException,
-  BadRequestException
+  BadRequestException,
+  HttpStatus,
+  HttpCode
 } from '@nestjs/common';
 import { Request } from 'express';
 import { StudentService } from './student.service';
@@ -23,12 +25,12 @@ import { Tenant } from '../tenant/schemas/tenant.schema';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @Controller('students')
-@UseGuards(TenantGuard)
-@UseGuards(JwtAuthGuard)
+@UseGuards(TenantGuard, JwtAuthGuard) // Combined guard declarations
 export class StudentController {
   constructor(private readonly studentService: StudentService) {}
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   async create(
     @CurrentTenant() tenant: Tenant,
     @Req() req: Request,
@@ -40,8 +42,8 @@ export class StudentController {
     );
   }
 
-  @Get('')
-  async GetAllStudents(
+  @Get()
+  async getAllStudents(
     @CurrentTenant() tenant: Tenant,
     @Req() req: Request,
     @Query() searchDto: SearchStudentDto
@@ -51,17 +53,8 @@ export class StudentController {
       searchDto
     );
   }
-  @Get('search')
-  async search(
-    @CurrentTenant() tenant: Tenant,
-    @Req() req: Request,
-    @Query() searchDto: SearchStudentDto
-  ) {
-    return this.studentService.searchStudents(
-      req['tenantConnection'],
-      searchDto
-    );
-  }
+
+  // Remove the duplicate endpoint by merging with the above
 
   @Get(':id')
   async findOne(
@@ -104,6 +97,10 @@ export class StudentController {
     @Param('id') id: string,
     @Body() document: { documentType: string; documentUrl: string }
   ) {
+    if (!document.documentType || !document.documentUrl) {
+      throw new BadRequestException('Document type and URL are required');
+    }
+    
     const updated = await this.studentService.addDocument(
       req['tenantConnection'],
       id,
@@ -157,6 +154,10 @@ export class StudentController {
     @Req() req: Request,
     @Param('cnic') guardianCnic: string
   ) {
+    if (!guardianCnic.match(/^[0-9]{5}-[0-9]{7}-[0-9]{1}$/)) {
+      throw new BadRequestException('CNIC must be in format: 00000-0000000-0');
+    }
+    
     return this.studentService.getStudentsByGuardianCnic(
       req['tenantConnection'],
       guardianCnic
@@ -175,6 +176,14 @@ export class StudentController {
       exitRemarks?: string;
     }
   ) {
+    // Validate status transitions
+    if (['Graduated', 'Expelled', 'Withdrawn'].includes(statusData.status) && 
+        (!statusData.exitStatus || !statusData.exitDate)) {
+      throw new BadRequestException(
+        'Exit status and exit date are required when status is Graduated, Expelled, or Withdrawn'
+      );
+    }
+    
     const updated = await this.studentService.updateStudentStatus(
       req['tenantConnection'],
       id,
@@ -192,6 +201,7 @@ export class StudentController {
   }
 
   @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
     @CurrentTenant() tenant: Tenant,
     @Req() req: Request,

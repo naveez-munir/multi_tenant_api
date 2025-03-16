@@ -28,11 +28,11 @@ export class Student extends BaseUserEntity {
   @Prop({ type: Types.ObjectId, ref: 'Class' })
   class?: Types.ObjectId;
 
-  @Prop({ unique: true })
+  @Prop({ unique: true, sparse: true })
   rollNumber?: string;
 
-  @Prop({ required: true })
-  enrollmentDate: Date;
+  @Prop({ })
+  enrollmentDate?: Date;
 
   @Prop({ required: true })
   admissionDate: Date;
@@ -42,7 +42,7 @@ export class Student extends BaseUserEntity {
     enum: ['Completed', 'Migrated', 'Expelled', 'Withdrawn', 'None'],
     default: 'None',
   })
-  exitStatus?: string; // Reason for leaving the school
+  exitStatus?: string;
 
   @Prop()
   exitDate?: Date;
@@ -60,7 +60,6 @@ export class Student extends BaseUserEntity {
   @Prop({ type: Number, min: 0, max: 100 })
   attendancePercentage?: number;
 
-
   // Documents
   @Prop({
     type: [
@@ -70,6 +69,7 @@ export class Student extends BaseUserEntity {
         uploadDate: { type: Date, default: Date.now },
       },
     ],
+    default: [],
   })
   documents: Record<string, any>[];
 
