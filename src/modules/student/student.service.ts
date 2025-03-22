@@ -8,6 +8,7 @@ import { SearchStudentDto } from './dto/search-student.dto';
 import { ClassSchema } from '../class/schemas/class.schema';
 import { StudentListResponseDto } from './dto/student-list-response.dto';
 import { Counter, CounterSchema } from 'src/common/schemas/counter.schema';
+import { GuardianSchema } from './schemas/guardian.schema';
 
 @Injectable()
 export class StudentService extends BaseService<Student> {
@@ -22,6 +23,9 @@ export class StudentService extends BaseService<Student> {
       }
       if (!connection.models['Counter']) {
         connection.model('Counter', CounterSchema);
+      }
+      if (!connection.models['Guardian']) {
+        connection.model('Guardian', GuardianSchema);
       }
     } catch (error) {
       console.error('Model initialization error:', error);
@@ -54,6 +58,13 @@ export class StudentService extends BaseService<Student> {
     }
   }
 
+  private prepareStudentData(studentDto: CreateStudentDto | UpdateStudentDto): Record<string, any> {
+    const studentData: Record<string, any> = { ...studentDto };
+    delete studentData.guardian;
+    delete studentData.guardianId;
+    return studentData;
+  }
+
   async createStudent(
     connection: Connection,
     createDto: CreateStudentDto
@@ -67,7 +78,28 @@ export class StudentService extends BaseService<Student> {
         throw new BadRequestException(`Student with CNIC ${createDto.cniNumber} already exists`);
       }
 
-      const studentData = { ...createDto };
+      let guardianId = null;
+      if (createDto.guardian) {
+        const GuardianModel = connection.model('Guardian');
+        let guardian = await GuardianModel.findOne({ cniNumber: createDto.guardian.cniNumber });
+        if (!guardian) {
+          guardian = await GuardianModel.create({
+            name: createDto.guardian.name,
+            cniNumber: createDto.guardian.cniNumber,
+            relationship: createDto.guardian.relationship,
+            phone: createDto.guardian.phone,
+            email: createDto.guardian.email,
+            students: [],
+          });
+        }
+        guardianId = guardian._id;
+      } else if (createDto.guardianId) {
+        guardianId = createDto.guardianId;
+      }
+      const studentData = this.prepareStudentData(createDto);
+      if (guardianId) {
+        studentData.guardian = guardianId;
+      }
       const student = await repository.create(studentData);
       try {
         const nextRollNumber = await this.getNextSequence(connection, 'studentRollNumber');
@@ -76,6 +108,12 @@ export class StudentService extends BaseService<Student> {
         });
       } catch (rollNumberError) {
         console.error('Failed to generate roll number:', rollNumberError);
+      }
+      if (guardianId) {
+        const GuardianModel = connection.model('Guardian', GuardianSchema);
+        await GuardianModel.findByIdAndUpdate(guardianId, {
+          $addToSet: { students: student._id }
+        });
       }
 
       const populatedStudent = await repository.findWithOptions(
@@ -110,8 +148,17 @@ export class StudentService extends BaseService<Student> {
       if (searchDto.cniNumber) {
         query.cniNumber = searchDto.cniNumber;
       }
-      if (searchDto.guardianCnic) {
-        query['guardian.cniNumber'] = searchDto.guardianCnic;
+      if (searchDto.guardianId) {
+        query.guardian = new Types.ObjectId(searchDto.guardianId);
+      } else if (searchDto.guardianCnic) {
+        await this.initializeModels(connection);
+        const GuardianModel = connection.model('Guardian', GuardianSchema);
+        const guardian = await GuardianModel.findOne({ cniNumber: searchDto.guardianCnic });
+        if (guardian) {
+          query.guardian = guardian._id;
+        } else {
+          return [];
+        }
       }
       if (searchDto.gradeLevel) {
         query.gradeLevel = searchDto.gradeLevel;
@@ -126,9 +173,9 @@ export class StudentService extends BaseService<Student> {
       await this.initializeModels(connection);
       
       const students = await repository.findWithOptions(query, {
-        populate: {
-          path: 'class',
-          select: 'className'
+        populate: { 
+          path: 'class', 
+          select: 'className' 
         },
         sort: { gradeLevel: 1, firstName: 1, lastName: 1 }
       });
@@ -161,9 +208,12 @@ export class StudentService extends BaseService<Student> {
           );
         }
       }
-      
-      await repository.findByIdAndUpdate(id, updateDto);
-      
+      const studentData = this.prepareStudentData(updateDto);
+      if (updateDto.guardianId) {
+        studentData.guardian = new Types.ObjectId(updateDto.guardianId.toString());
+      }
+      await repository.findByIdAndUpdate(id, studentData);
+
       const updatedStudent = await repository.findWithOptions(
         { _id: new Types.ObjectId(id) },
         { populate: { path: 'class', select: 'className' } }
@@ -276,9 +326,13 @@ export class StudentService extends BaseService<Student> {
     try {
       await this.initializeModels(connection);
       const repository = this.getRepository(connection);
-      
+      const GuardianModel = connection.model('Guardian', GuardianSchema);
+      const guardian = await GuardianModel.findOne({ cniNumber: guardianCnic });
+      if (!guardian) {
+        return [];
+      }
       const students = await repository.findWithOptions(
-        { 'guardian.cniNumber': guardianCnic },
+        { guardian: guardian._id },
         {
           populate: {
             path: 'class',
@@ -352,7 +406,7 @@ export class StudentService extends BaseService<Student> {
         { _id: new Types.ObjectId(id) },
         {
           populate: {
-            path: 'class',
+            path: 'class guardian',
             select: 'className section classGradeLevel classTeacher classTempTeacher classSubjects'
           }
         }
@@ -379,6 +433,15 @@ export class StudentService extends BaseService<Student> {
       if (!student) {
         return false;
       }
+
+      if (student.guardian) {
+        await this.initializeModels(connection);
+        const GuardianModel = connection.model('Guardian', GuardianSchema);
+        await GuardianModel.findByIdAndUpdate(student.guardian, {
+          $pull: { students: student._id }
+        });
+      }
+      
       return await repository.delete(id);
     } catch (error) {
       console.error('Error deleting student:', error);

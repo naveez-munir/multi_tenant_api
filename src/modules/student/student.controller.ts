@@ -216,4 +216,20 @@ export class StudentController {
     }
     return { message: 'Student deleted successfully' };
   }
+
+  @Get('guardian/id/:guardianId')
+  async getByGuardianId(
+    @CurrentTenant() tenant: Tenant,
+    @Req() req: Request,
+    @Param('guardianId') guardianId: string
+  ) {
+    const searchDto: SearchStudentDto = {
+      guardianId: guardianId
+    };
+    
+    return this.studentService.searchStudents(
+      req['tenantConnection'],
+      searchDto
+    );
+  }
 }

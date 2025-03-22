@@ -17,31 +17,33 @@ export class AuthService {
     private tenantService: TenantService,
   ) {}
 
-  async validateUser(tenantName: string, email: string, password: string) {
-
-    if (!tenantName) {
-      const superAdmin = await this.userModel.findOne({
-        email,
-        role: UserRole.SUPER_ADMIN
-      });
-
-      if (superAdmin && await bcrypt.compare(password, superAdmin.password)) {
-        return superAdmin;
+  async validateUser(tenantName: string, identifier: string, password: string) {
+    try {
+      if (!tenantName || tenantName === 'admin') {
+        const superAdmin = await this.userModel.findOne({
+          $or: [{ email: identifier }, { cnic: identifier }],
+          role: UserRole.SUPER_ADMIN
+        });
+        if (superAdmin && await bcrypt.compare(password, superAdmin.password)) {
+          return superAdmin;
+        }
+        return null;
+      }
+  
+      const tenant = await this.tenantService.getTenantByName(tenantName);
+      if (!tenant) {
+        throw new UnauthorizedException('Invalid tenant');
+      }
+      const connection = await this.tenantService.getTenantConnection(tenant._id.toString());
+      const user = await this.usersService.findByIdentifier(connection, identifier); 
+  
+      if (user && await bcrypt.compare(password, user.password)) {
+        return user;
       }
       return null;
+    } catch (error) {
+      console.log('>>>>>>>>', error)
     }
-
-    const tenant = await this.tenantService.getTenantByName(tenantName);
-    if (!tenant) {
-      throw new UnauthorizedException('Invalid tenant');
-    }
-    const connection = await this.tenantService.getTenantConnection(tenant._id.toString());
-    const user = await this.usersService.findByEmail(connection, email);
-
-    if (user && await bcrypt.compare(password, user.password)) {
-      return user;
-    }
-    return null;
   }
 
   async login(user: any, tenantName: string) {

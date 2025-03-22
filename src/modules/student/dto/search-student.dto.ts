@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsEnum, Matches } from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsMongoId } from 'class-validator';
+import { IsPakistaniCNIC } from 'src/common/dto/common-validations.dto';
 
 export class SearchStudentDto {
   @IsOptional()
@@ -11,17 +12,17 @@ export class SearchStudentDto {
 
   @IsOptional()
   @IsString({ message: 'CNIC number must be a string' })
-  @Matches(/^[0-9]{5}-[0-9]{7}-[0-9]{1}$/, { 
-    message: 'CNIC must be in format: 00000-0000000-0' 
-  })
+  @IsPakistaniCNIC()
   cniNumber?: string;
 
   @IsOptional()
   @IsString({ message: 'Guardian CNIC must be a string' })
-  @Matches(/^[0-9]{5}-[0-9]{7}-[0-9]{1}$/, { 
-    message: 'Guardian CNIC must be in format: 00000-0000000-0' 
-  })
+  @IsPakistaniCNIC()
   guardianCnic?: string;
+
+  @IsOptional()
+  @IsMongoId({ message: 'Invalid guardian ID format' })
+  guardianId?: string;
 
   @IsOptional()
   @IsString({ message: 'Grade level must be a string' })

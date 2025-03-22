@@ -6,6 +6,7 @@ import { TeacherSchema } from 'src/modules/teacher/schemas/teacher.schema';
 import { StaffSchema } from 'src/modules/staff/schema/staff.schema';
 import { LeaveBalanceSchema } from '../schemas/leaveBalance.schema';
 import { ApproveLeaveDto, CreateLeaveBalanceDto, CreateLeaveDto, LeaveBalanceResponseDto, LeaveResponseDto, SearchLeaveDto, UpdateLeaveBalanceDto, UpdateLeaveDto } from '../dto/leave.dto';
+
 @Injectable()
 export class LeaveService extends BaseService<Leave> {
 
@@ -13,7 +14,7 @@ export class LeaveService extends BaseService<Leave> {
     super('Leave', LeaveSchema);
   }
 
-  private async initializeModels(connection: Connection): Promise<void> {
+  private async ensureInitialized(connection: Connection): Promise<void> {
     try {
       if (!connection.models['Teacher']) {
         connection.model('Teacher', TeacherSchema);
@@ -29,6 +30,12 @@ export class LeaveService extends BaseService<Leave> {
   private validateObjectId(id: string, fieldName: string): void {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException(`Invalid ${fieldName} ID format`);
+    }
+  }
+
+  private validateDateRange(startDate: Date, endDate: Date): void {
+    if (startDate > endDate) {
+      throw new BadRequestException('Start date cannot be after end date');
     }
   }
 
@@ -48,6 +55,17 @@ export class LeaveService extends BaseService<Leave> {
     }
 
     return employee;
+  }
+
+  private async getEmployeeWithValidation(
+    connection: Connection,
+    employeeId: string,
+    employeeType: string
+  ): Promise<any> {
+    this.validateObjectId(employeeId, 'employee');
+    await this.ensureInitialized(connection);
+    
+    return this.getEmployeeDetails(connection, employeeId, employeeType);
   }
 
   private calculateLeaveDays(startDate: Date, endDate: Date): number {
@@ -90,24 +108,116 @@ export class LeaveService extends BaseService<Leave> {
     return overlappingLeaves.length > 0;
   }
 
-  /**
-   * Create a new leave request
-   */
+  private getDefaultAllowances(employee: any): Record<string, number> {
+    const defaults = {
+      sickLeaveAllocation: 12,
+      casualLeaveAllocation: 12,
+      earnedLeaveAllocation: 0
+    };
+    
+    // Override with employee specific values if available
+    if (employee.sickLeaveAllowance !== undefined) {
+      defaults.sickLeaveAllocation = employee.sickLeaveAllowance;
+    }
+    if (employee.casualLeaveAllowance !== undefined) {
+      defaults.casualLeaveAllocation = employee.casualLeaveAllowance;
+    }
+    if (employee.earnedLeaveAllowance !== undefined) {
+      defaults.earnedLeaveAllocation = employee.earnedLeaveAllowance;
+    }
+    
+    return defaults;
+  }
+
+  private async getOrCreateLeaveBalance(
+    connection: Connection, 
+    employeeId: string, 
+    employeeType: string, 
+    year: number = new Date().getFullYear(),
+    employee?: any
+  ): Promise<any> {
+    const balanceRepo = connection.model("LeaveBalance", LeaveBalanceSchema);
+    
+    let leaveBalance = await balanceRepo.findOne({
+      employeeId: new Types.ObjectId(employeeId),
+      employeeType,
+      year,
+      isActive: true
+    });
+    
+    if (!leaveBalance) {
+      // If employee not passed, fetch it
+      if (!employee) {
+        employee = await this.getEmployeeDetails(connection, employeeId, employeeType);
+      }
+      
+      // Create default balance
+      const defaultAllowances = this.getDefaultAllowances(employee);
+      
+      leaveBalance = await balanceRepo.create({
+        employeeId: new Types.ObjectId(employeeId),
+        employeeType,
+        year,
+        sickLeaveAllocation: defaultAllowances.sickLeaveAllocation,
+        sickLeaveUsed: 0,
+        casualLeaveAllocation: defaultAllowances.casualLeaveAllocation,
+        casualLeaveUsed: 0,
+        earnedLeaveAllocation: defaultAllowances.earnedLeaveAllocation,
+        earnedLeaveUsed: 0,
+        unpaidLeaveUsed: 0,
+        isActive: true
+      });
+    }
+    
+    return leaveBalance;
+  }
+
+  private determineLeavePaymentStatus(
+    leaveType: string,
+    numberOfDays: number,
+    leaveBalance: any
+  ): boolean {
+    if (leaveType === 'UNPAID') {
+      return false;
+    }
+    
+    let isPaid = true;
+    if (leaveType === 'SICK') {
+      const remaining = leaveBalance.sickLeaveAllocation - leaveBalance.sickLeaveUsed;
+      isPaid = remaining >= numberOfDays;
+    } else if (leaveType === 'CASUAL') {
+      const remaining = leaveBalance.casualLeaveAllocation - leaveBalance.casualLeaveUsed;
+      isPaid = remaining >= numberOfDays;
+    } else if (leaveType === 'EARNED') {
+      const remaining = leaveBalance.earnedLeaveAllocation - leaveBalance.earnedLeaveUsed;
+      isPaid = remaining >= numberOfDays;
+    }
+    
+    return isPaid;
+  }
+
+  private handleServiceError(error: any, operation: string): never {
+    if (error instanceof NotFoundException || 
+        error instanceof BadRequestException ||
+        error instanceof ConflictException) {
+      throw error;
+    }
+    
+    throw new BadRequestException(`Failed to ${operation}: ${error.message}`);
+  }
+
   async createLeaveRequest(
     connection: Connection,
     createDto: CreateLeaveDto
   ): Promise<LeaveResponseDto> {
     try {
-      await this.initializeModels(connection);
+      await this.ensureInitialized(connection);
       this.validateObjectId(createDto.employeeId, 'employee');
       
       // Validate dates
       const startDate = new Date(createDto.startDate);
       const endDate = new Date(createDto.endDate);
-      
-      if (startDate > endDate) {
-        throw new BadRequestException('Start date cannot be after end date');
-      }
+      this.validateDateRange(startDate, endDate);
       
       // Get employee details to ensure it exists
       const employee = await this.getEmployeeDetails(
@@ -132,66 +242,18 @@ export class LeaveService extends BaseService<Leave> {
         throw new ConflictException('Employee already has approved or pending leave for this date range');
       }
       
-      // Check leave balance for this employee
+      // Get or create leave balance
       const currentYear = new Date().getFullYear();
-      const leaveBalanceRepo = connection.model("LeaveBalance", LeaveBalanceSchema)
-      let leaveBalance = await leaveBalanceRepo.findOne({
-        employeeId: new Types.ObjectId(createDto.employeeId),
-        employeeType: createDto.employeeType,
-        year: currentYear,
-        isActive: true
-      });
-
-      // Create leave balance if it doesn't exist
-      if (!leaveBalance) {
-        const defaultAllowances = {
-          sickLeaveAllocation: 12,
-          casualLeaveAllocation: 12,
-          earnedLeaveAllocation: 0
-        };
-        
-        // Try to get allowances from employee record if available
-        if (employee.sickLeaveAllowance !== undefined) {
-          defaultAllowances.sickLeaveAllocation = employee.sickLeaveAllowance;
-        }
-        if (employee.casualLeaveAllowance !== undefined) {
-          defaultAllowances.casualLeaveAllocation = employee.casualLeaveAllowance;
-        }
-        if (employee.earnedLeaveAllowance !== undefined) {
-          defaultAllowances.earnedLeaveAllocation = employee.earnedLeaveAllowance;
-        }
-        
-        const newBalance = await leaveBalanceRepo.create({
-          employeeId: new Types.ObjectId(createDto.employeeId),
-          employeeType: createDto.employeeType,
-          year: currentYear,
-          sickLeaveAllocation: defaultAllowances.sickLeaveAllocation,
-          sickLeaveUsed: 0,
-          casualLeaveAllocation: defaultAllowances.casualLeaveAllocation,
-          casualLeaveUsed: 0,
-          earnedLeaveAllocation: defaultAllowances.earnedLeaveAllocation,
-          earnedLeaveUsed: 0,
-          unpaidLeaveUsed: 0,
-          isActive: true
-        });
-        
-        leaveBalance = newBalance;
-      }
+      const leaveBalance = await this.getOrCreateLeaveBalance(
+        connection,
+        createDto.employeeId,
+        createDto.employeeType,
+        currentYear,
+        employee
+      );
 
       // Determine if leave should be paid or unpaid based on balance
-      let isPaid = true;
-      if (createDto.leaveType === 'UNPAID') {
-        isPaid = false;
-      } else if (createDto.leaveType === 'SICK') {
-        const remaining = leaveBalance.sickLeaveAllocation - leaveBalance.sickLeaveUsed;
-        isPaid = remaining >= numberOfDays;
-      } else if (createDto.leaveType === 'CASUAL') {
-        const remaining = leaveBalance.casualLeaveAllocation - leaveBalance.casualLeaveUsed;
-        isPaid = remaining >= numberOfDays;
-      } else if (createDto.leaveType === 'EARNED') {
-        const remaining = leaveBalance.earnedLeaveAllocation - leaveBalance.earnedLeaveUsed;
-        isPaid = remaining >= numberOfDays;
-      }
+      const isPaid = this.determineLeavePaymentStatus(createDto.leaveType, numberOfDays, leaveBalance);
 
       // Create the leave request
       const leaveRepo = this.getRepository(connection);
@@ -212,24 +274,17 @@ export class LeaveService extends BaseService<Leave> {
       // Return formatted response
       return LeaveResponseDto.fromEntity(newLeave, employee);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException ||
-          error instanceof ConflictException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to create leave request: ${error.message}`);
+      this.handleServiceError(error, 'create leave request');
     }
   }
 
-  /**
-   * Find leave record by ID with populated employee information
-   */
   async findLeaveById(
     connection: Connection,
     id: string
   ): Promise<LeaveResponseDto> {
     try {
       this.validateObjectId(id, 'leave');
-      await this.initializeModels(connection);
+      await this.ensureInitialized(connection);
       const repository = this.getRepository(connection);
 
       const leave = await repository.findById(id);
@@ -260,22 +315,16 @@ export class LeaveService extends BaseService<Leave> {
 
       return LeaveResponseDto.fromEntity(leave, employee, approver);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to fetch leave');
+      this.handleServiceError(error, 'fetch leave');
     }
   }
 
-  /**
-   * Search leave records with filters
-   */
   async searchLeaves(
     connection: Connection,
     searchDto: SearchLeaveDto
   ): Promise<LeaveResponseDto[]> {
     try {
-      await this.initializeModels(connection);
+      await this.ensureInitialized(connection);
       const repository = this.getRepository(connection);
       const query: Record<string, any> = {};
 
@@ -378,31 +427,17 @@ export class LeaveService extends BaseService<Leave> {
       
       return results;
     } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to search leaves: ${error.message}`);
+      this.handleServiceError(error, 'search leaves');
     }
   }
 
-  /**
-   * Find all leave records for a specific employee
-   */
   async findAllByEmployee(
     connection: Connection,
     employeeId: string,
     employeeType: string
   ): Promise<LeaveResponseDto[]> {
     try {
-      this.validateObjectId(employeeId, 'employee');
-      await this.initializeModels(connection);
-      
-      // Get employee details to ensure it exists
-      const employee = await this.getEmployeeDetails(
-        connection,
-        employeeId,
-        employeeType
-      );
+      const employee = await this.getEmployeeWithValidation(connection, employeeId, employeeType);
       
       const repository = this.getRepository(connection);
       const leaves = await repository.find({
@@ -414,16 +449,10 @@ export class LeaveService extends BaseService<Leave> {
         return LeaveResponseDto.fromEntity(leave, employee);
       });
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to fetch employee leaves: ${error.message}`);
+      this.handleServiceError(error, 'fetch employee leaves');
     }
   }
 
-  /**
-   * Update leave request
-   */
   async updateLeave(
     connection: Connection,
     id: string,
@@ -431,7 +460,7 @@ export class LeaveService extends BaseService<Leave> {
   ): Promise<LeaveResponseDto> {
     try {
       this.validateObjectId(id, 'leave');
-      await this.initializeModels(connection);
+      await this.ensureInitialized(connection);
       const repository = this.getRepository(connection);
       
       // Get current leave to check status
@@ -453,9 +482,7 @@ export class LeaveService extends BaseService<Leave> {
         const startDate = updateDto.startDate ? new Date(updateDto.startDate) : currentLeave.startDate;
         const endDate = updateDto.endDate ? new Date(updateDto.endDate) : currentLeave.endDate;
         
-        if (startDate > endDate) {
-          throw new BadRequestException('Start date cannot be after end date');
-        }
+        this.validateDateRange(startDate, endDate);
         
         // Calculate new number of days
         numberOfDays = this.calculateLeaveDays(startDate, endDate);
@@ -482,17 +509,47 @@ export class LeaveService extends BaseService<Leave> {
       // Get updated leave with employee details
       return this.findLeaveById(connection, id);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException ||
-          error instanceof ConflictException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to update leave: ${error.message}`);
+      this.handleServiceError(error, 'update leave');
     }
   }
 
-  /**
-   * Approve or reject leave request
-   */
+  private async updateLeaveBalanceOnApproval(
+    connection: Connection,
+    leave: Leave
+  ): Promise<void> {
+    const balanceRepo = connection.model("LeaveBalance", LeaveBalanceSchema);
+    const year = new Date(leave.startDate).getFullYear();
+    
+    // Get current balance
+    let balance = await balanceRepo.findOne({
+      employeeId: leave.employeeId,
+      employeeType: leave.employeeType,
+      year,
+      isActive: true
+    });
+    
+    if (!balance) {
+      // Should not happen as balance is created during leave request
+      throw new NotFoundException('Leave balance not found');
+    }
+    
+    // Determine which balance to update based on leave type
+    const updateData: Record<string, any> = {};
+    
+    if (leave.leaveType === 'SICK') {
+      updateData.sickLeaveUsed = balance.sickLeaveUsed + leave.numberOfDays;
+    } else if (leave.leaveType === 'CASUAL') {
+      updateData.casualLeaveUsed = balance.casualLeaveUsed + leave.numberOfDays;
+    } else if (leave.leaveType === 'EARNED') {
+      updateData.earnedLeaveUsed = balance.earnedLeaveUsed + leave.numberOfDays;
+    } else if (leave.leaveType === 'UNPAID') {
+      updateData.unpaidLeaveUsed = balance.unpaidLeaveUsed + leave.numberOfDays;
+    }
+    
+    // Update balance
+    await balanceRepo.findByIdAndUpdate(balance._id, updateData);
+  }
+
   async approveLeave(
     connection: Connection,
     id: string,
@@ -502,7 +559,7 @@ export class LeaveService extends BaseService<Leave> {
       this.validateObjectId(id, 'leave');
       this.validateObjectId(approveDto.approvedBy, 'approver');
       
-      await this.initializeModels(connection);
+      await this.ensureInitialized(connection);
       const repository = this.getRepository(connection);
       
       // Get current leave
@@ -541,8 +598,7 @@ export class LeaveService extends BaseService<Leave> {
           currentLeave
         );
       }
-      
-      // Get updated leave with employee details
+
       const employee = await this.getEmployeeDetails(
         connection,
         currentLeave.employeeId.toString(),
@@ -552,63 +608,17 @@ export class LeaveService extends BaseService<Leave> {
       const updatedLeave = await repository.findById(id);
       return LeaveResponseDto.fromEntity(updatedLeave, employee, approver);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to approve leave: ${error.message}`);
+      this.handleServiceError(error, 'approve leave');
     }
   }
 
-  /**
-   * Update leave balance after approving leave
-   */
-  private async updateLeaveBalanceOnApproval(
-    connection: Connection,
-    leave: Leave
-  ): Promise<void> {
-    const balanceRepo = connection.model("LeaveBalance", LeaveBalanceSchema);
-    const year = new Date(leave.startDate).getFullYear();
-    
-    // Get current balance
-    let balance = await balanceRepo.findOne({
-      employeeId: leave.employeeId,
-      employeeType: leave.employeeType,
-      year,
-      isActive: true
-    });
-    
-    if (!balance) {
-      // Should not happen as balance is created during leave request
-      throw new NotFoundException('Leave balance not found');
-    }
-    
-    // Determine which balance to update based on leave type
-    const updateData: Record<string, any> = {};
-    
-    if (leave.leaveType === 'SICK') {
-      updateData.sickLeaveUsed = balance.sickLeaveUsed + leave.numberOfDays;
-    } else if (leave.leaveType === 'CASUAL') {
-      updateData.casualLeaveUsed = balance.casualLeaveUsed + leave.numberOfDays;
-    } else if (leave.leaveType === 'EARNED') {
-      updateData.earnedLeaveUsed = balance.earnedLeaveUsed + leave.numberOfDays;
-    } else if (leave.leaveType === 'UNPAID') {
-      updateData.unpaidLeaveUsed = balance.unpaidLeaveUsed + leave.numberOfDays;
-    }
-    
-    // Update balance
-    await balanceRepo.findByIdAndUpdate(balance._id, updateData);
-  }
-
-  /**
-   * Cancel a leave request
-   */
   async cancelLeave(
     connection: Connection,
     id: string
   ): Promise<boolean> {
     try {
       this.validateObjectId(id, 'leave');
-      await this.initializeModels(connection);
+      await this.ensureInitialized(connection);
       const repository = this.getRepository(connection);
       
       // Get current leave
@@ -621,32 +631,20 @@ export class LeaveService extends BaseService<Leave> {
       if (currentLeave.status !== 'PENDING') {
         throw new BadRequestException(`Cannot cancel leave with status ${currentLeave.status}`);
       }
-      
-      // Update status to cancelled
       await repository.findByIdAndUpdate(id, { status: 'CANCELLED' });
       
       return true;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to cancel leave: ${error.message}`);
+      this.handleServiceError(error, 'cancel leave');
     }
   }
 
-  /**
-   * Create leave balance record
-   */
   async createLeaveBalance(
     connection: Connection,
     createDto: CreateLeaveBalanceDto
   ): Promise<LeaveBalanceResponseDto> {
     try {
-      this.validateObjectId(createDto.employeeId, 'employee');
-      await this.initializeModels(connection);
-      
-      // Check if employee exists
-      const employee = await this.getEmployeeDetails(
+      const employee = await this.getEmployeeWithValidation(
         connection,
         createDto.employeeId,
         createDto.employeeType
@@ -680,17 +678,10 @@ export class LeaveService extends BaseService<Leave> {
       const newBalance = await repository.create(balanceData);
       return LeaveBalanceResponseDto.fromEntity(newBalance, employee);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException ||
-          error instanceof ConflictException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to create leave balance: ${error.message}`);
+      this.handleServiceError(error, 'create leave balance');
     }
   }
 
-  /**
-   * Get leave balance by employee and year
-   */
   async getLeaveBalance(
     connection: Connection,
     employeeId: string,
@@ -698,50 +689,19 @@ export class LeaveService extends BaseService<Leave> {
     year: number
   ): Promise<LeaveBalanceResponseDto> {
     try {
-      this.validateObjectId(employeeId, 'employee');
-      await this.initializeModels(connection);
-      
-      // Check if employee exists
-      const employee = await this.getEmployeeDetails(
+      const employee = await this.getEmployeeWithValidation(connection, employeeId, employeeType);
+
+      const balance = await this.getOrCreateLeaveBalance(
         connection,
         employeeId,
-        employeeType
-      );
-      
-      const repository = connection.model('LeaveBalance', LeaveBalanceSchema);
-
-      const balance = await repository.findOne({
-        employeeId: new Types.ObjectId(employeeId),
         employeeType,
         year,
-        isActive: true
-      });
-      
-      if (!balance) {
-        // Create default balance if not found
-        const defaultBalance = await repository.create({
-          employeeId: new Types.ObjectId(employeeId),
-          employeeType,
-          year,
-          sickLeaveAllocation: employee.sickLeaveAllowance || 12,
-          casualLeaveAllocation: employee.casualLeaveAllowance || 12,
-          earnedLeaveAllocation: employee.earnedLeaveAllowance || 0,
-          sickLeaveUsed: 0,
-          casualLeaveUsed: 0,
-          earnedLeaveUsed: 0,
-          unpaidLeaveUsed: 0,
-          isActive: true
-        });
-        
-        return LeaveBalanceResponseDto.fromEntity(defaultBalance, employee);
-      }
+        employee
+      );
       
       return LeaveBalanceResponseDto.fromEntity(balance, employee);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to get leave balance: ${error.message}`);
+      this.handleServiceError(error, 'get leave balance');
     }
   }
 
@@ -751,7 +711,7 @@ export class LeaveService extends BaseService<Leave> {
   ): Promise<LeaveBalanceResponseDto> {
     try {
       this.validateObjectId(id, 'balance');
-      await this.initializeModels(connection);
+      await this.ensureInitialized(connection);
       const repository = connection.model('LeaveBalance', LeaveBalanceSchema);
       const balance = await repository.findById(id);
       
@@ -768,16 +728,10 @@ export class LeaveService extends BaseService<Leave> {
       
       return LeaveBalanceResponseDto.fromEntity(balance, employee);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to get leave balance: ${error.message}`);
+      this.handleServiceError(error, 'get leave balance by id');
     }
   }
 
-  /**
-   * Update leave balance
-   */
   async updateLeaveBalance(
     connection: Connection,
     id: string,
@@ -785,7 +739,7 @@ export class LeaveService extends BaseService<Leave> {
   ): Promise<LeaveBalanceResponseDto> {
     try {
       this.validateObjectId(id, 'balance');
-      await this.initializeModels(connection);
+      await this.ensureInitialized(connection);
       const repository = connection.model('LeaveBalance', LeaveBalanceSchema);
       const balance = await repository.findById(id);
       
@@ -807,10 +761,7 @@ export class LeaveService extends BaseService<Leave> {
       const updatedBalance = await repository.findById(id);
       return LeaveBalanceResponseDto.fromEntity(updatedBalance, employee);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(`Failed to update leave balance: ${error.message}`);
+      this.handleServiceError(error, 'update leave balance');
     }
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, NestMiddleware, NotFoundException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { TenantService } from '../tenant.service';
+import mongoose from 'mongoose';
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
@@ -9,6 +10,13 @@ export class TenantMiddleware implements NestMiddleware {
   async use(req: Request, res: Response, next: NextFunction) {
     const tenantName = req.headers['x-tenant-name'] as string;
     if(tenantName === 'admin') {
+      const globalConnection = mongoose.connection;
+      const adminTenant = {
+        _id: 'admin',
+        name: 'admin',
+      };
+      req['tenant'] = adminTenant;
+      req['tenantConnection'] = globalConnection;
       next();
       return
     }

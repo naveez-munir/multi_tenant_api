@@ -2,7 +2,8 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { Connection, Types } from 'mongoose';
 import { Teacher, TeacherSchema } from './schemas/teacher.schema';
 import { BaseService } from '../../common/services/base.service';
-import { CreateTeacherDto, DocumentDto, EducationHistoryDto, ExperienceDto } from './dto/create-teacher.dto';
+import { CreateTeacherDto } from './dto/create-teacher.dto';
+import { DocumentDto, EducationHistoryDto, ExperienceDto} from '../../common/dto/index';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { TeacherListResponseDto } from './dto/teacher-list-response.dto';
 import { ClassSchema } from '../class/schemas/class.schema';
@@ -160,7 +161,7 @@ export class TeacherService extends BaseService<Teacher> {
       const updateData = {
         ...updateDto,
         ...(updateDto.classTeacherOf && {
-          classTeacherOf: new Types.ObjectId(updateDto.classTeacherOf._id.toString())
+          classTeacherOf: new Types.ObjectId(updateDto.classTeacherOf.toString())
         }),
         ...(updateDto.userId && {
           userId: new Types.ObjectId(updateDto.userId.toString())

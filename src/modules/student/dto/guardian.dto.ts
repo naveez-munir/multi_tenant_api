@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString, IsEnum, IsEmail, IsOptional, Matches } from 'class-validator';
+import { IsNotEmpty, IsString, IsEnum, IsOptional, IsEmail } from 'class-validator';
+import { IsPakistaniCNIC, IsPakistaniPhone } from 'src/common/dto/common-validations.dto';
 
 export class GuardianDto {
   @IsNotEmpty({ message: 'Guardian name is required' })
@@ -7,9 +8,7 @@ export class GuardianDto {
 
   @IsNotEmpty({ message: 'CNIC number is required' })
   @IsString({ message: 'CNIC number must be a string' })
-  @Matches(/^[0-9]{5}-[0-9]{7}-[0-9]{1}$/, { 
-    message: 'CNIC must be in format: 00000-0000000-0' 
-  })
+  @IsPakistaniCNIC()
   cniNumber: string;
 
   @IsNotEmpty({ message: 'Relationship is required' })
@@ -20,9 +19,7 @@ export class GuardianDto {
 
   @IsNotEmpty({ message: 'Phone number is required' })
   @IsString({ message: 'Phone number must be a string' })
-  @Matches(/^(\+92|0)[0-9]{10}$/, { 
-    message: 'Phone must be a valid Pakistan number (e.g., +923001234567 or 03001234567)' 
-  })
+  @IsPakistaniPhone()
   phone: string;
 
   @IsOptional()

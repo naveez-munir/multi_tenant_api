@@ -10,18 +10,25 @@ import {
   Patch,
   UseGuards,
   HttpStatus,
-  Req
+  Req,
+  UseInterceptors
 } from '@nestjs/common';
 import { Request } from 'express';
 import { FeeCategoryService } from '../services/fee-category.service';
 import { CreateFeeCategoryDto, UpdateFeeCategoryDto, ListFeeCategoryDto } from '../dto/create-fee-category.dto';
 import { FeeCategory } from '../../schemas/fee-category.schema';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { TenantGuard } from 'src/modules/tenant/guards/tenant.guard';
+import { IsAllowedToCreateFeeCategory } from 'src/common/decorators/is-accountant-base-role.decorator';
+import { AccountBodyEnhancerInterceptor } from 'src/common/interceptors/account-body.interceptor';
 
 @Controller('fee-categories')
+@UseGuards(JwtAuthGuard, TenantGuard, IsAllowedToCreateFeeCategory)
 export class FeeCategoryController {
   constructor(private readonly feeCategoryService: FeeCategoryService) {}
 
   @Post()
+  @UseInterceptors(AccountBodyEnhancerInterceptor)
   async create(
     @Req() req: Request,
     @Body() createDto: CreateFeeCategoryDto
@@ -55,6 +62,7 @@ export class FeeCategoryController {
   }
 
   @Put(':id')
+  @UseInterceptors(AccountBodyEnhancerInterceptor)
   async update(
     @Req() req: Request,
     @Param('id') id: string,
@@ -79,6 +87,7 @@ export class FeeCategoryController {
   }
 
   @Patch(':id/toggle-status')
+  @UseInterceptors(AccountBodyEnhancerInterceptor)
   async toggleStatus(
     @Req() req: Request,
     @Param('id') id: string

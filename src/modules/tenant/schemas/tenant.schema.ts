@@ -18,6 +18,15 @@ export class Tenant {
   @Prop({ required: true, default: 'active' })
   status: 'active' | 'inactive';
 
+  @Prop({ required: true, default: 150 })
+  maxStudents: number;
+
+  @Prop({ required: true, default: 10 })
+  maxTeachers: number;
+
+  @Prop({ required: true, default: 5 })
+  maxStaff: number;
+
   @Prop({ type: Object, default: {} })
   settings: Record<string, any>;
 }

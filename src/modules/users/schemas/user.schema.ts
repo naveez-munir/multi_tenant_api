@@ -13,8 +13,8 @@ export class User extends BaseEntity {
   @Prop({ required: true })
   name: string;
 
-  @Prop({required: true, unique: true})
-  cnic: string
+  @Prop({ unique: true})
+  cnic?: string
 
   @Prop({ default: true })
   isActive: boolean;

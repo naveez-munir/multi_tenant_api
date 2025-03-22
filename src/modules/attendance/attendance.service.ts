@@ -1,184 +1,3 @@
-// import { Injectable, ConflictException, NotFoundException } from "@nestjs/common";
-// import { Connection, Types } from "mongoose";
-// import { BaseService } from "../../common/services/base.service";
-// import { Attendance, AttendanceSchema } from "./schema/attendance.schema";
-// import { CreateAttendanceDto } from "./dto/create-attendance-dto";
-// import { UpdateAttendanceDto } from "./dto/update-attendance-dto";
-// import { AttendanceStatus } from "src/common/interfaces/attendanceStatuses";
-// import { BatchAttendanceDto, ClassAttendanceFilterDto, UserAttendanceFilterDto, MonthlyReportFilterDto } from "./dto/batch-attendance.dto";
-// import { StudentSchema } from "../student/schemas/student.schema";
-// import { TeacherSchema } from "../teacher/schemas/teacher.schema";
-// import { ClassSchema } from "../class/schemas/class.schema";
-
-// @Injectable()
-// export class AttendanceService extends BaseService<Attendance> {
-//   constructor() {
-//     super("Attendance", AttendanceSchema);
-//   }
-
-//   private async initializeModels(connection: Connection) {
-//       try {
-//         // Initialize required models if they don't exist
-//         if (!connection.models['Student']) {
-//           connection.model('Student', StudentSchema);
-//         }
-//         if (!connection.models['Teacher']) {
-//           connection.model('Teacher', TeacherSchema);
-//         }
-//         if (!connection.models['Class']) {
-//           connection.model('Class', ClassSchema); // Add this
-//         }
-//       } catch (error) {
-//         console.error('Model initialization error:', error);
-//       }
-//     }
-
-//   // ✅ Create Attendance Record
-//   async createAttendance(connection: Connection, createDto: CreateAttendanceDto): Promise<Attendance> {
-//     try {
-//       const repository = this.getRepository(connection);
-//       return await repository.create(createDto);
-//     } catch (error) {
-//       console.log('>>>>>>>>>', error)
-//       if (error.code === 11000) {
-//         throw new ConflictException("Attendance record already exists for this user on this date.");
-//       }
-//       throw error;
-//     }
-//   }
-
-//   // ✅ Get All Attendance Records
-//   async getAllAttendance(connection: Connection): Promise<Attendance[]> {
-//     await this.initializeModels(connection)
-//     const repository = this.getRepository(connection);
-//     return repository.findWithOptions({}, {
-//       populate: {
-//         path: 'userId classId'
-//       }
-//     });
-//   }
-
-//   // ✅ Get Attendance by ID
-//   async getAttendanceById(connection: Connection, id: string): Promise<Attendance | null> {
-//     const repository = this.getRepository(connection);
-//     return repository.findById(id);
-//   }
-
-//   // ✅ Update Attendance Record
-//   async updateAttendance(connection: Connection, id: string, updateDto: UpdateAttendanceDto): Promise<Attendance | null> {
-//     const repository = this.getRepository(connection);
-//     return repository.findByIdAndUpdate(id, updateDto);
-//   }
-
-//   // ✅ Delete Attendance Record
-//   async deleteAttendance(connection: Connection, id: string): Promise<boolean> {
-//     const repository = this.getRepository(connection);
-//     return repository.delete(id);
-//   }
-
-//   async createBatchAttendance(connection: Connection, batchDto: BatchAttendanceDto): Promise<Attendance[]> {
-//     const repository = this.getRepository(connection);
-//     const attendanceRecords = batchDto.records.map(record => ({
-//       userType: batchDto.userType,
-//       classId: batchDto.classId,
-//       date: batchDto.date,
-//       userId: record.userId,
-//       status: record.status,
-//       reason: record.reason
-//     }));
-
-//     return repository.insertMany(attendanceRecords);
-//   }
-
-//   async getClassAttendanceReport(
-//     connection: Connection,
-//     classId: string,
-//     filter: ClassAttendanceFilterDto
-//   ) {
-//     const repository = this.getRepository(connection);
-//     const query: any = { classId: new Types.ObjectId(classId) };
-  
-//     if (filter.startDate) query.date = { $gte: filter.startDate };
-//     if (filter.endDate) query.date.$lte = filter.endDate;
-//     if (filter.status) query.status = filter.status;
-  
-//     const records = await repository.findWithOptions(query, {
-//       populate: { path: 'userId', select: 'name rollNumber' }
-//     });
-  
-//     return {
-//       total: records.length,
-//       present: records.filter(r => r.status === AttendanceStatus.PRESENT).length,
-//       absent: records.filter(r => r.status === AttendanceStatus.ABSENT).length,
-//       late: records.filter(r => r.status === AttendanceStatus.LATE).length,
-//       records
-//     };
-//   }
-
-//   async getUserAttendanceReport(
-//     connection: Connection,
-//     userId: string,
-//     filter: UserAttendanceFilterDto
-//   ) {
-//     const repository = this.getRepository(connection);
-//     const query: any = { userId: new Types.ObjectId(userId) };
-  
-//     if (filter.startDate) query.date = { $gte: filter.startDate };
-//     if (filter.endDate) query.date.$lte = filter.endDate;
-//     if (filter.userType) query.userType = filter.userType;
-  
-//     return repository.findWithOptions(query, {
-//       sort: { date: -1 }
-//     });
-//   }
-
-//   async getMonthlyReport(
-//     connection: Connection,
-//     filter: MonthlyReportFilterDto
-//   ) {
-//     const repository = this.getRepository(connection);
-//   const startDate = new Date(filter.year, filter.month - 1, 1);
-//   const endDate = new Date(filter.year, filter.month, 0);
-
-//   const query: any = {
-//     date: { $gte: startDate, $lte: endDate }
-//   };
-
-//   if (filter.userType) query.userType = filter.userType;
-//   if (filter.classId) query.classId = filter.classId;
-
-//   const records = await repository.findWithOptions(query, {
-//     populate: { path: 'userId', select: 'name' }
-//   });
-
-//     // Group by date
-//     const dailyReport = {};
-//     records.forEach(record => {
-//       const day = record.date.getDate();
-//       if (!dailyReport[day]) dailyReport[day] = {
-//         present: 0,
-//         absent: 0,
-//         late: 0
-//       };
-//       dailyReport[day][record.status.toLowerCase()]++;
-//     });
-
-//     return {
-//       month: filter.month,
-//       year: filter.year,
-//       dailyReport,
-//       summary: {
-//         total: records.length,
-//         present: records.filter(r => r.status === AttendanceStatus.PRESENT).length,
-//         absent: records.filter(r => r.status === AttendanceStatus.ABSENT).length,
-//         late: records.filter(r => r.status === AttendanceStatus.LATE).length,
-//       }
-//     };
-//   }
-// }
-
-
-// src/modules/attendance/attendance.service.ts
 import { Injectable, ConflictException, NotFoundException } from "@nestjs/common";
 import { Connection, Types } from "mongoose";
 import { BaseService } from "../../common/services/base.service";
@@ -191,6 +10,7 @@ import { AttendanceResponseDto, BatchCreateResponseDto, ClassAttendanceReportDto
 import { CreateAttendanceDto } from "./dto/create-attendance-dto";
 import { UpdateAttendanceDto } from "./dto/update-attendance-dto";
 import { BatchAttendanceDto, ClassAttendanceFilterDto, MonthlyReportFilterDto, UserAttendanceFilterDto } from "./dto/batch-attendance.dto";
+import { AttendanceType } from "src/common/interfaces/attendanceType";
 
 @Injectable()
 export class AttendanceService extends BaseService<Attendance> {
@@ -220,7 +40,7 @@ export class AttendanceService extends BaseService<Attendance> {
       id: data._id.toString(),
       user: {
         id: data.userId._id.toString(),
-        name: data.userId.name,
+        name: `${data.userId.firstName} ${data.userId.lastName}`,
         rollNumber: data.userId.rollNumber,
         employeeId: data.userId.employeeId,
         type: data.userType
@@ -246,13 +66,19 @@ export class AttendanceService extends BaseService<Attendance> {
   ): Promise<CreateAttendanceResponseDto> {
     try {
       const repository = this.getRepository(connection);
-      const attendance = await repository.create(createDto);
+      const { classId, ...otherFields } = createDto;
+      const data = {
+        ...otherFields,
+        ...(classId ? { classId: new Types.ObjectId(classId) } : {})
+      };
+      const attendance = await repository.create(data);
       return {
         success: true,
         message: "Attendance record created successfully",
         id: attendance._id.toString()
       };
     } catch (error) {
+      console.error('Error creating attendance record:', error);
       if (error.code === 11000) {
         throw new ConflictException("Attendance record already exists for this user on this date");
       }
@@ -260,16 +86,48 @@ export class AttendanceService extends BaseService<Attendance> {
     }
   }
 
-  async getAllAttendance(connection: Connection): Promise<AttendanceResponseDto[]> {
+  async getAllAttendance(
+    connection: Connection,
+    filters: {
+      userType?: AttendanceType;
+      startDate?: Date;
+      endDate?: Date;
+    } = {}
+  ): Promise<AttendanceResponseDto[]> {
     await this.initializeModels(connection);
     const repository = this.getRepository(connection);
     
-    const records = await repository.findWithOptions({}, {
+    // Set default filters
+    const query: any = {};
+    
+    // Default userType filter (STUDENT if not specified)
+    if (filters.userType) {
+      query.userType = filters.userType;
+    } else {
+      query.userType = AttendanceType.STUDENT;
+    }
+    
+    // Default date range (last 5 days if not specified)
+    if (filters.startDate || filters.endDate) {
+      query.date = {};
+      if (filters.startDate) query.date.$gte = filters.startDate;
+      if (filters.endDate) query.date.$lte = filters.endDate;
+    } else {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(endDate.getDate() - 5);
+      query.date = { $gte: startDate, $lte: endDate };
+    }
+
+    // Find records with populated references
+    const options: any = {
       populate: { 
         path: 'userId classId'
       }
-    });
+    };
 
+    const records = await repository.findWithOptions(query, options);
+  
     return records.map(record => this.transformToAttendanceResponse(record));
   }
 
@@ -302,8 +160,12 @@ export class AttendanceService extends BaseService<Attendance> {
     updateDto: UpdateAttendanceDto
   ): Promise<CreateAttendanceResponseDto> {
     const repository = this.getRepository(connection);
-    
-    const updated = await repository.findByIdAndUpdate(id, updateDto);
+    const { classId, ...otherFields } = updateDto;
+      const data = {
+        ...otherFields,
+        ...(classId ? { classId: new Types.ObjectId(classId) } : {})
+      };
+    const updated = await repository.findByIdAndUpdate(id, data);
     if (!updated) {
       throw new NotFoundException('Attendance record not found');
     }
@@ -341,7 +203,7 @@ export class AttendanceService extends BaseService<Attendance> {
       
       const attendanceRecords = batchDto.records.map(record => ({
         userType: batchDto.userType,
-        classId: batchDto.classId,
+        classId: batchDto.classId || null,
         date: batchDto.date,
         userId: record.userId,
         status: record.status,

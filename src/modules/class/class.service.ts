@@ -2,7 +2,7 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { Connection, Types } from 'mongoose';
 import { Class, ClassSchema } from './schemas/class.schema';
 import { BaseService } from '../../common/services/base.service';
-import { CreateClassDto } from './dto/create-class.dto';
+import { CreateClassDto, TeacherType } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { ClassListResponseDto } from './dto/class-list-response.dto';
 import { TenantAwareRepository } from 'src/common/repositories/tenant-aware.repository';
@@ -30,9 +30,11 @@ export class ClassService extends BaseService<Class> {
     excludeClassId?: string
   ): Promise<void> {
     try {
-      console.log('>>>>>>>>>', teacherId)
       const query: Record<string, any> = {
-        classTeacher: new Types.ObjectId(teacherId)
+        $or: [
+          { classTeacher: new Types.ObjectId(teacherId) },
+          { classTempTeacher: new Types.ObjectId(teacherId) }
+        ]
       };
   
       if (excludeClassId) {
@@ -199,6 +201,64 @@ export class ClassService extends BaseService<Class> {
     );
 
     return ClassListResponseDto.fromEntity(updatedClass[0]);
+  }
+  async handleTeacherAssignment(
+    connection: Connection,
+    classId: string,
+    teacherType: TeacherType,
+    teacherId?: string,
+  ): Promise<ClassListResponseDto> {
+    try {
+      if (!Types.ObjectId.isValid(classId)) {
+        throw new BadRequestException('Invalid class ID');
+      }
+
+      await this.makeConnection(connection);
+      const repository = this.getRepository(connection);
+      const TeacherModel = connection.model('Teacher', TeacherSchema);
+
+      const classDoc = await repository.findById(classId);
+      if (!classDoc) {
+        throw new NotFoundException('Class not found');
+      }
+
+      if(teacherId) {
+        await repository.findByIdAndUpdate(classId, {
+          [teacherType === TeacherType.MAIN ? 'classTeacher' : 'classTempTeacher']: new Types.ObjectId(teacherId)
+        });
+        await TeacherModel.findByIdAndUpdate(teacherId, {
+          classTeacherOf: new Types.ObjectId(classId)
+        });
+      }
+      else {
+        await repository.findByIdAndUpdate(classId, {
+          [teacherType === TeacherType.MAIN ? 'classTeacher' : 'classTempTeacher']: null
+        });
+        const currentTeacherId = teacherType === TeacherType.MAIN 
+        ? classDoc.classTeacher 
+        : classDoc.classTempTeacher;
+        await TeacherModel.findByIdAndUpdate(currentTeacherId, {
+          classTeacherOf: null
+        });
+      }
+
+      const updatedClass = await repository.findWithOptions(
+        { _id: new Types.ObjectId(classId) },
+        {
+          populate: {
+            path: 'classTeacher classTempTeacher classSubjects',
+            select: 'name subject'
+          }
+        }
+      );
+
+      return ClassListResponseDto.fromEntity(updatedClass[0]);
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to remove main teacher');
+    }
   }
 
   async addSubjects(

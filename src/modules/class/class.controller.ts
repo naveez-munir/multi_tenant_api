@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ClassService } from './class.service';
-import { CreateClassDto } from './dto/create-class.dto';
+import { CreateClassDto, TeacherType } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { TenantGuard } from '../tenant/guards/tenant.guard';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -71,15 +71,55 @@ export class ClassController {
     @Param('id') id: string,
     @Body('teacherId') teacherId: string
   ) {
-    const updated = await this.classService.assignTeacher(
+    const updated = await this.classService.handleTeacherAssignment(
       req['tenantConnection'],
       id,
-      teacherId
+      TeacherType.MAIN,
+      teacherId,
+
     );
     if (!updated) {
       throw new NotFoundException('Class not found');
     }
     return updated;
+  }
+
+  @Put(':id/teacher/remove')
+  async removeTeacherAssignment(
+    @Req() req: Request,
+    @Param('id') id: string
+  ) {
+    return this.classService.handleTeacherAssignment(
+      req['tenantConnection'],
+      id,
+      TeacherType.MAIN
+    );
+  }
+
+  @Put(':id/temp-teacher/assign')
+  async assignTempTeacher(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body('teacherId') teacherId: string
+  ) {
+    return this.classService.handleTeacherAssignment(
+      req['tenantConnection'],
+      id,
+      TeacherType.TEMPORARY,
+      teacherId,
+    );
+  }
+
+  @Put(':id/temp-teacher/remove')
+  async removeTempTeacher(
+    @Req() req: Request,
+    @Param('id') id: string
+  ) {
+    return this.classService.handleTeacherAssignment(
+      req['tenantConnection'],
+      id,
+      TeacherType.TEMPORARY,
+    );
   }
 
   @Put(':id/subjects/add')
