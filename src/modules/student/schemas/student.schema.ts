@@ -70,6 +70,6 @@ export class Student extends BaseUserEntity {
 
 export const StudentSchema = SchemaFactory.createForClass(Student);
 
-StudentSchema.index({ firstName: 1,email: 1,  cniNumber: 1,});
+// StudentSchema.index({ firstName: 1,email: 1,  cniNumber: 1,});
 
 
