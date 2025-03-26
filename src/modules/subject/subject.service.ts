@@ -43,10 +43,11 @@ export class SubjectService extends BaseService<Subject> {
     }
     return repository.findWithOptions(searchQuery, {
       sort: { createdAt: -1 },
-      pagination: {
-        page: paginationQuery?.page || 1,
-        limit: paginationQuery?.limit || 10
-      }
+      // pagination: {
+      //   page: paginationQuery?.page || 1,
+      //   limit: paginationQuery?.limit || 10
+      // }
+      //No need for pagination as of now
     });
   }
 
