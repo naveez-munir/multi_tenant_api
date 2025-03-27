@@ -29,8 +29,13 @@ export class ExceptionInterceptor implements NestInterceptor {
           ));
         }
         if (error.code === 11000) { // MongoDB duplicate key error
+          const fieldMatch = error.message.match(/index:\s+(?:.*\$)?(\w+)_\d+\s+dup key/);
+          const valueMatch = error.message.match(/dup key:\s+{\s+(\w+):\s+"?([^"}\s]+)"?/);
+          
+          let fieldName = fieldMatch ? fieldMatch[1] : 'unknown';
+          let fieldValue = valueMatch ? valueMatch[2] : 'unknown';
           return throwError(() => new HttpException(
-            'Duplicate entry found', 
+            `Duplicate entry found, The ${fieldName} '${fieldValue}' already exists`, 
             HttpStatus.CONFLICT
           ));
         }
