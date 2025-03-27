@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Connection } from 'mongoose';
 import { Subject, SubjectSchema } from './schemas/subject.schema';
 import { BaseService } from 'src/common/services/base.service';
@@ -16,15 +16,8 @@ export class SubjectService extends BaseService<Subject> {
     connection: Connection,
     createDto: CreateSubjectDto
   ) {
-    try {
-      const repository = this.getRepository(connection);
-      return await repository.create(createDto);
-    } catch (error) {
-      if (error.code === 11000) {
-        throw new ConflictException('Subject with this code already exists');
-      }
-      throw error;
-    }
+    const repository = this.getRepository(connection);
+    return await repository.create(createDto);
   }
 
   async findSubjects(
@@ -64,15 +57,8 @@ export class SubjectService extends BaseService<Subject> {
     id: string,
     updateDto: UpdateSubjectDto
   ) {
-    try {
-      const repository = this.getRepository(connection);
-      return await repository.findByIdAndUpdate(id, updateDto);
-    } catch (error) {
-      if (error.code === 11000) {
-        throw new ConflictException('Subject with this name or code already exists');
-      }
-      throw error;
-    }
+    const repository = this.getRepository(connection);
+    return await repository.findByIdAndUpdate(id, updateDto);
   }
 
   async deleteSubject(

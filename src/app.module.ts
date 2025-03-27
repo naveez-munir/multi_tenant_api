@@ -16,6 +16,8 @@ import { DailyDiaryModule } from './modules/dailyDiary/daily-diary.modules';
 import { AttendanceModule } from './modules/Attendance/attendance.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { LeaveModule } from './modules/leave/leave.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { ExceptionInterceptor } from './common/interceptors/exception.interceptor';
 
 @Module({
   imports: [
@@ -38,7 +40,10 @@ import { LeaveModule } from './modules/leave/leave.module';
     LeaveModule,
     AccountsModule,
   ],
-  providers: [ConnectionManager],
+  providers: [ConnectionManager, {
+    provide: APP_INTERCEPTOR,
+    useClass: ExceptionInterceptor
+  }],
 })
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
