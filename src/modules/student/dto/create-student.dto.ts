@@ -37,7 +37,7 @@ export class CreateStudentDto extends BaseUserDto {
   gradeLevel: string;
 
   @IsOptional()
-  @IsMongoId({ message: 'Invalid class ID format' })
+  // @IsMongoId({ message: 'Invalid class ID format' })
   @Transform(({ value }) => (Types.ObjectId.isValid(value) ? new Types.ObjectId(String(value)) : value))
   class?: Types.ObjectId;
 

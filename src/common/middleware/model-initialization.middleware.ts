@@ -5,6 +5,8 @@ import { ClassSchema } from 'src/modules/class/schemas/class.schema';
 import { StudentSchema } from 'src/modules/student/schemas/student.schema';
 import { CounterSchema } from '../schemas/counter.schema';
 import { GuardianSchema } from 'src/modules/student/schemas/guardian.schema';
+import { SubjectSchema } from 'src/modules/subject/schemas/subject.schema';
+import { TeacherSchema } from 'src/modules/teacher/schemas/teacher.schema';
 
 @Injectable()
 export class ModelInitializationMiddleware implements NestMiddleware {
@@ -12,7 +14,9 @@ export class ModelInitializationMiddleware implements NestMiddleware {
     { name: 'Student', schema: StudentSchema },
     { name: 'Class', schema: ClassSchema },
     { name: 'Counter', schema: CounterSchema },
-    { name: 'Guardian', schema: GuardianSchema }
+    { name: 'Guardian', schema: GuardianSchema },
+    { name: 'Subject', schema: SubjectSchema},
+    { name: 'Teacher', schema: TeacherSchema },
   ];
 
   async use(req: Request, res: Response, next: NextFunction) {

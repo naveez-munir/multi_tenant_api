@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Connection, Types } from 'mongoose';
 import { Class, ClassSchema } from './schemas/class.schema';
 import { BaseService } from '../../common/services/base.service';
@@ -6,8 +6,6 @@ import { CreateClassDto, TeacherType } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { ClassListResponseDto } from './dto/class-list-response.dto';
 import { TenantAwareRepository } from 'src/common/repositories/tenant-aware.repository';
-import { SubjectSchema } from '../subject/schemas/subject.schema';
-import { TeacherSchema } from '../teacher/schemas/teacher.schema';
 
 @Injectable()
 export class ClassService extends BaseService<Class> {
@@ -15,44 +13,31 @@ export class ClassService extends BaseService<Class> {
     super('Class', ClassSchema);
   }
 
-  private async makeConnection(connection: Connection): Promise<void> {
-    try {
-      connection.model('Subject', SubjectSchema);
-      connection.model('Teacher', TeacherSchema);
-    } catch (error) {
-      console.log('Model initialization error:', error);
-    }
-  }
-
   private async checkTeacherAssignment(
     repository: TenantAwareRepository<Class>,
     teacherId: string,
     excludeClassId?: string
   ): Promise<void> {
-    try {
-      const query: Record<string, any> = {
-        $or: [
-          { classTeacher: new Types.ObjectId(teacherId) },
-          { classTempTeacher: new Types.ObjectId(teacherId) }
-        ]
-      };
-  
-      if (excludeClassId) {
-        query._id = { $ne: new Types.ObjectId(excludeClassId) };
-      }
-  
-      const existingClass = await repository.findOne(query);
-      if (existingClass) {
-        throw new ConflictException('Teacher is already assigned to another class');
-      }
-    } catch (error) {
-      console.log('>>>>>>', error)
+    const query: Record<string, any> = {
+      $or: [
+        { classTeacher: new Types.ObjectId(teacherId) },
+        { classTempTeacher: new Types.ObjectId(teacherId) }
+      ]
+    };
+
+    if (excludeClassId) {
+      query._id = { $ne: new Types.ObjectId(excludeClassId) };
+    }
+
+    const existingClass = await repository.findOne(query);
+    if (existingClass) {
+      throw new BadRequestException('Teacher is already assigned to another class');
     }
   }
 
   private cleanClassData(data: CreateClassDto | UpdateClassDto) {
     const cleanedData = { ...data };
-    if (data.classSection.trim() === '') {
+    if (data.classSection?.trim() === '') {
       delete cleanedData.classSection;
     }
     if (!data.classTeacher || data.classTeacher.toString() === '') {
@@ -68,42 +53,23 @@ export class ClassService extends BaseService<Class> {
     connection: Connection,
     createDto: CreateClassDto
   ): Promise<ClassListResponseDto> {
-    try {
-      await this.makeConnection(connection);
-      const repository = this.getRepository(connection);
+    const repository = this.getRepository(connection);
+    const cleanedData = this.cleanClassData(createDto);
 
-      // Clean the data before processing
-      const cleanedData = this.cleanClassData(createDto);
-
-      if (cleanedData.classTeacher) {
-        await this.checkTeacherAssignment(repository, cleanedData.classTeacher.toString());
-      }
-
-      const newClass = await repository.create(cleanedData);
-      const populatedClass = await repository.findWithOptions(
-        { _id: newClass._id },
-        {
-          populate: {
-            path: 'classTeacher classTempTeacher classSubjects',
-            select: 'name subject'
-          }
-        }
-      );
-
-      return ClassListResponseDto.fromEntity(populatedClass[0]);
-    } catch (error) {
-      if (error.code === 11000) {
-        throw new ConflictException('Class with this name and section already exists');
-      }
-      throw error;
+    if (cleanedData.classTeacher) {
+      await this.checkTeacherAssignment(repository, cleanedData.classTeacher.toString());
     }
+
+    const newClass = await repository.create(cleanedData);
+    const populatedClass = await this.getPopulatedClass(repository, newClass._id);
+
+    return ClassListResponseDto.fromEntity(populatedClass[0]);
   }
 
   async findClasses(
     connection: Connection,
     filter: Record<string, any> = {}
   ): Promise<ClassListResponseDto[]> {
-    await this.makeConnection(connection);
     const repository = this.getRepository(connection);
     
     const classes = await repository.findWithOptions(filter, {
@@ -112,6 +78,7 @@ export class ClassService extends BaseService<Class> {
         select: '-createdAt -updatedAt'
       }
     });
+    
     return classes.map(classData => ClassListResponseDto.fromEntity(classData));
   }
 
@@ -119,17 +86,13 @@ export class ClassService extends BaseService<Class> {
     connection: Connection,
     id: string
   ): Promise<Class> {
-    await this.makeConnection(connection);
     const repository = this.getRepository(connection);
-    const classDoc = await repository.findWithOptions(
-      { _id: new Types.ObjectId(id) },
-      {
-        populate: {
-          path: 'classTeacher classTempTeacher classSubjects',
-          select: '-createdAt -updatedAt'
-        }
-      }
-    );
+    
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid ID format');
+    }
+    
+    const classDoc = await this.getPopulatedClass(repository, id);
 
     if (!classDoc || !classDoc.length) {
       throw new NotFoundException('Class not found');
@@ -143,38 +106,17 @@ export class ClassService extends BaseService<Class> {
     id: string,
     updateDto: UpdateClassDto
   ): Promise<ClassListResponseDto> {
-    try {
-      await this.makeConnection(connection);
-      const repository = this.getRepository(connection);
+    const repository = this.getRepository(connection);
+    const cleanedData = this.cleanClassData(updateDto);
 
-      // Clean the data before processing
-      const cleanedData = this.cleanClassData(updateDto);
-
-      if (cleanedData.classTeacher) {
-        await this.checkTeacherAssignment(repository, cleanedData.classTeacher.toString(), id);
-      }
-
-      await repository.findByIdAndUpdate(id, cleanedData);
-      
-      const updatedClass = await repository.findWithOptions(
-        { _id: new Types.ObjectId(id) },
-        {
-          populate: {
-            path: 'classTeacher classTempTeacher classSubjects',
-            select: 'name subject'
-          }
-        }
-      );
-      return ClassListResponseDto.fromEntity(updatedClass[0]);
-    } catch (error) {
-      if (error.code === 11000) {
-        throw new ConflictException('Class with this name and section already exists');
-      }
-      if (error.name === 'CastError') {
-        throw new BadRequestException('Invalid ID format provided');
-      }
-      throw error;
+    if (cleanedData.classTeacher) {
+      await this.checkTeacherAssignment(repository, cleanedData.classTeacher.toString(), id);
     }
+
+    await repository.findByIdAndUpdate(id, cleanedData);
+    const updatedClass = await this.getPopulatedClass(repository, id);
+    
+    return ClassListResponseDto.fromEntity(updatedClass[0]);
   }
 
   async assignTeacher(
@@ -182,7 +124,6 @@ export class ClassService extends BaseService<Class> {
     classId: string,
     teacherId: string
   ): Promise<ClassListResponseDto> {
-    await this.makeConnection(connection);
     const repository = this.getRepository(connection);
     await this.checkTeacherAssignment(repository, teacherId, classId);
     
@@ -190,75 +131,53 @@ export class ClassService extends BaseService<Class> {
       classTeacher: new Types.ObjectId(teacherId)
     });
 
-    const updatedClass = await repository.findWithOptions(
-      { _id: new Types.ObjectId(classId) },
-      {
-        populate: {
-          path: 'classTeacher classTempTeacher classSubjects',
-          select: 'name subject'
-        }
-      }
-    );
-
+    const updatedClass = await this.getPopulatedClass(repository, classId);
     return ClassListResponseDto.fromEntity(updatedClass[0]);
   }
+
   async handleTeacherAssignment(
     connection: Connection,
     classId: string,
     teacherType: TeacherType,
     teacherId?: string,
   ): Promise<ClassListResponseDto> {
-    try {
-      if (!Types.ObjectId.isValid(classId)) {
-        throw new BadRequestException('Invalid class ID');
-      }
+    if (!Types.ObjectId.isValid(classId)) {
+      throw new BadRequestException('Invalid class ID');
+    }
 
-      await this.makeConnection(connection);
-      const repository = this.getRepository(connection);
-      const TeacherModel = connection.model('Teacher', TeacherSchema);
+    const repository = this.getRepository(connection);
+    const TeacherModel = connection.model('Teacher');
 
-      const classDoc = await repository.findById(classId);
-      if (!classDoc) {
-        throw new NotFoundException('Class not found');
-      }
+    const classDoc = await repository.findById(classId);
+    if (!classDoc) {
+      throw new NotFoundException('Class not found');
+    }
 
-      if(teacherId) {
-        await repository.findByIdAndUpdate(classId, {
-          [teacherType === TeacherType.MAIN ? 'classTeacher' : 'classTempTeacher']: new Types.ObjectId(teacherId)
-        });
-        await TeacherModel.findByIdAndUpdate(teacherId, {
-          classTeacherOf: new Types.ObjectId(classId)
-        });
-      }
-      else {
-        await repository.findByIdAndUpdate(classId, {
-          [teacherType === TeacherType.MAIN ? 'classTeacher' : 'classTempTeacher']: null
-        });
-        const currentTeacherId = teacherType === TeacherType.MAIN 
+    if (teacherId) {
+      await repository.findByIdAndUpdate(classId, {
+        [teacherType === TeacherType.MAIN ? 'classTeacher' : 'classTempTeacher']: new Types.ObjectId(teacherId)
+      });
+      await TeacherModel.findByIdAndUpdate(teacherId, {
+        classTeacherOf: new Types.ObjectId(classId)
+      });
+    } else {
+      const currentTeacherId = teacherType === TeacherType.MAIN 
         ? classDoc.classTeacher 
         : classDoc.classTempTeacher;
+        
+      await repository.findByIdAndUpdate(classId, {
+        [teacherType === TeacherType.MAIN ? 'classTeacher' : 'classTempTeacher']: null
+      });
+      
+      if (currentTeacherId) {
         await TeacherModel.findByIdAndUpdate(currentTeacherId, {
           classTeacherOf: null
         });
       }
-
-      const updatedClass = await repository.findWithOptions(
-        { _id: new Types.ObjectId(classId) },
-        {
-          populate: {
-            path: 'classTeacher classTempTeacher classSubjects',
-            select: 'name subject'
-          }
-        }
-      );
-
-      return ClassListResponseDto.fromEntity(updatedClass[0]);
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to remove main teacher');
     }
+
+    const updatedClass = await this.getPopulatedClass(repository, classId);
+    return ClassListResponseDto.fromEntity(updatedClass[0]);
   }
 
   async addSubjects(
@@ -266,7 +185,6 @@ export class ClassService extends BaseService<Class> {
     classId: string,
     subjectIds: string[]
   ): Promise<ClassListResponseDto> {
-    await this.makeConnection(connection);
     const repository = this.getRepository(connection);
     const classDoc = await this.findById(connection, classId);
 
@@ -283,16 +201,7 @@ export class ClassService extends BaseService<Class> {
       classSubjects: uniqueSubjects
     });
 
-    const updatedClass = await repository.findWithOptions(
-      { _id: new Types.ObjectId(classId) },
-      {
-        populate: {
-          path: 'classTeacher classTempTeacher classSubjects',
-          select: 'name subject'
-        }
-      }
-    );
-
+    const updatedClass = await this.getPopulatedClass(repository, classId);
     return ClassListResponseDto.fromEntity(updatedClass[0]);
   }
 
@@ -301,7 +210,6 @@ export class ClassService extends BaseService<Class> {
     classId: string,
     subjectIds: string[]
   ): Promise<ClassListResponseDto> {
-    await this.makeConnection(connection);
     const repository = this.getRepository(connection);
     const classDoc = await this.findById(connection, classId);
 
@@ -313,16 +221,7 @@ export class ClassService extends BaseService<Class> {
       classSubjects: remainingSubjects
     });
 
-    const updatedClass = await repository.findWithOptions(
-      { _id: new Types.ObjectId(classId) },
-      {
-        populate: {
-          path: 'classTeacher classTempTeacher classSubjects',
-          select: 'name subject'
-        }
-      }
-    );
-
+    const updatedClass = await this.getPopulatedClass(repository, classId);
     return ClassListResponseDto.fromEntity(updatedClass[0]);
   }
 
@@ -337,7 +236,6 @@ export class ClassService extends BaseService<Class> {
       query.classSection = sectionId;
     }
 
-    await this.makeConnection(connection);
     const repository = this.getRepository(connection);
     
     const classes = await repository.findWithOptions(query, {
@@ -355,9 +253,20 @@ export class ClassService extends BaseService<Class> {
     connection: Connection,
     id: string
   ): Promise<boolean> {
-    await this.makeConnection(connection);
     const repository = this.getRepository(connection);
     return repository.delete(id);
+  }
+
+  private async getPopulatedClass(repository: TenantAwareRepository<Class>, classId: string | Types.ObjectId) {
+    return repository.findWithOptions(
+      { _id: typeof classId === 'string' ? new Types.ObjectId(classId) : classId },
+      {
+        populate: {
+          path: 'classTeacher classTempTeacher classSubjects',
+          select: 'name subject'
+        }
+      }
+    );
   }
 }
 

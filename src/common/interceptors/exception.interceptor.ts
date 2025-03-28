@@ -5,7 +5,8 @@ import {
   CallHandler, 
   HttpException, 
   HttpStatus, 
-  Logger 
+  Logger,
+  BadRequestException 
 } from '@nestjs/common';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -18,6 +19,14 @@ export class ExceptionInterceptor implements NestInterceptor {
     return next.handle().pipe(
       catchError(error => {
         this.logger.error(`Exception caught: ${error.message}`, error.stack);
+
+        if (error instanceof BadRequestException) {
+          const response = error.getResponse();
+          if (typeof response === 'object' && response !== null) {
+            return throwError(() => error);
+          }
+        }
+
         if (error.name === 'CastError' && error.kind === 'ObjectId') {
           return throwError(() => new HttpException('Invalid ID format', HttpStatus.BAD_REQUEST));
         }
@@ -28,14 +37,14 @@ export class ExceptionInterceptor implements NestInterceptor {
             HttpStatus.BAD_REQUEST
           ));
         }
-        if (error.code === 11000) { // MongoDB duplicate key error
+        if (error.code === 11000) {
           const fieldMatch = error.message.match(/index:\s+(?:.*\$)?(\w+)_\d+\s+dup key/);
           const valueMatch = error.message.match(/dup key:\s+{\s+(\w+):\s+"?([^"}\s]+)"?/);
           
           let fieldName = fieldMatch ? fieldMatch[1] : 'unknown';
           let fieldValue = valueMatch ? valueMatch[2] : 'unknown';
           return throwError(() => new HttpException(
-            `Duplicate entry found, The ${fieldName} '${fieldValue}' already exists`, 
+            `Duplicate entry found. The ${fieldName} '${fieldValue}' already exists`, 
             HttpStatus.CONFLICT
           ));
         }
