@@ -110,7 +110,7 @@ export class StudentService extends BaseService<Student> {
     const students = await repository.findWithOptions(query, {
       populate: { 
         path: 'class guardian', 
-        select: 'className' 
+        // select: 'className' 
       },
       sort: { gradeLevel: 1, firstName: 1, lastName: 1 }
     });
