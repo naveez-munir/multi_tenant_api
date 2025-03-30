@@ -6,6 +6,7 @@ import { CreateClassDto, TeacherType } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
 import { ClassListResponseDto } from './dto/class-list-response.dto';
 import { TenantAwareRepository } from 'src/common/repositories/tenant-aware.repository';
+import { MongoDbUtils } from 'src/common/utils/mongodb.utils';
 
 @Injectable()
 export class ClassService extends BaseService<Class> {
@@ -87,12 +88,17 @@ export class ClassService extends BaseService<Class> {
     id: string
   ): Promise<Class> {
     const repository = this.getRepository(connection);
-    
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid ID format');
+
+    MongoDbUtils.validateId(id)
+    const classDoc = await repository.findWithOptions({
+      _id: new Types.ObjectId(id)
+    },
+    {
+      populate: {
+        path: 'classTeacher classTempTeacher classSubjects',
+      }
     }
-    
-    const classDoc = await this.getPopulatedClass(repository, id);
+  )
 
     if (!classDoc || !classDoc.length) {
       throw new NotFoundException('Class not found');
@@ -141,9 +147,8 @@ export class ClassService extends BaseService<Class> {
     teacherType: TeacherType,
     teacherId?: string,
   ): Promise<ClassListResponseDto> {
-    if (!Types.ObjectId.isValid(classId)) {
-      throw new BadRequestException('Invalid class ID');
-    }
+
+    MongoDbUtils.validateId(classId)
 
     const repository = this.getRepository(connection);
     const TeacherModel = connection.model('Teacher');
