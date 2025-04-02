@@ -673,6 +673,14 @@
   dependencies:
     "sparse-bitfield" "^3.0.3"
 
+"@nestjs/class-validator@^0.13.4":
+  "integrity" "sha512-/mqZL36LJ5uV5WDhi87Cd52IssuO+SStaOr2+6sBsvCCGUWkoJes4Wwzmm3m/gdHH+tsNxX60sVSzYcU6hAy9Q=="
+  "resolved" "https://registry.npmjs.org/@nestjs/class-validator/-/class-validator-0.13.4.tgz"
+  "version" "0.13.4"
+  dependencies:
+    "libphonenumber-js" "^1.9.43"
+    "validator" "^13.7.0"
+
 "@nestjs/cli@^10.0.0":
   "integrity" "sha512-s8qYd97bggqeK7Op3iD49X2MpFtW4LVNLAwXFkfbRxKME6IYT7X0muNTJ2+QfI8hpbNx9isWkrLWIp+g5FOhiA=="
   "resolved" "https://registry.npmjs.org/@nestjs/cli/-/cli-10.4.9.tgz"
@@ -698,7 +706,7 @@
     "webpack" "5.97.1"
     "webpack-node-externals" "3.0.0"
 
-"@nestjs/common@^10.0.0", "@nestjs/common@^8.0.0 || ^9.0.0 || ^10.0.0":
+"@nestjs/common@^10.0.0", "@nestjs/common@^10.0.0 || ^11.0.0", "@nestjs/common@^8.0.0 || ^9.0.0 || ^10.0.0":
   "integrity" "sha512-vaLg1ZgwhG29BuLDxPA9OAcIlgqzp9/N8iG0wGapyUNTf4IY4O6zAHgN6QalwLhFxq7nOI021vdRojR1oF3bqg=="
   "resolved" "https://registry.npmjs.org/@nestjs/common/-/common-10.4.15.tgz"
   "version" "10.4.15"
@@ -735,6 +743,11 @@
   dependencies:
     "@types/jsonwebtoken" "9.0.5"
     "jsonwebtoken" "9.0.2"
+
+"@nestjs/mapped-types@^2.1.0":
+  "integrity" "sha512-W+n+rM69XsFdwORF11UqJahn4J3xi4g/ZEOlJNL6KoW5ygWSmBB2p0S2BZ4FQeS/NDH72e6xIcu35SfJnE8bXw=="
+  "resolved" "https://registry.npmjs.org/@nestjs/mapped-types/-/mapped-types-2.1.0.tgz"
+  "version" "2.1.0"
 
 "@nestjs/mongoose@^10.1.0":
   "integrity" "sha512-1ExAnZUfh2QffEaGjqYGgVPy/sYBQCVLCLqVgkcClKx/BCd0QNgND8MB70lwyobp3nm/+nbGQqBpu9F3/hgOCw=="
@@ -1886,12 +1899,12 @@
   "resolved" "https://registry.npmjs.org/cjs-module-lexer/-/cjs-module-lexer-1.4.1.tgz"
   "version" "1.4.1"
 
-"class-transformer@*", "class-transformer@^0.5.1":
+"class-transformer@*", "class-transformer@^0.4.0 || ^0.5.0", "class-transformer@^0.5.1":
   "integrity" "sha512-SQa1Ws6hUbfC98vKGxZH3KFY0Y1lm5Zm0SY8XX9zbK7FJCyVEac3ATW0RIpwzW+oOfmHE5PMPufDG9hCfoEOMw=="
   "resolved" "https://registry.npmjs.org/class-transformer/-/class-transformer-0.5.1.tgz"
   "version" "0.5.1"
 
-"class-validator@*", "class-validator@^0.14.1":
+"class-validator@*", "class-validator@^0.13.0 || ^0.14.0", "class-validator@^0.14.1":
   "integrity" "sha512-2VEG9JICxIqTpoK1eMzZqaV+u/EiwEJkMGzTrZf6sU/fwsnOITVgYJ8yojSy6CaXtO9V0Cc6ZQZ8h8m4UBuLwQ=="
   "resolved" "https://registry.npmjs.org/class-validator/-/class-validator-0.14.1.tgz"
   "version" "0.14.1"
@@ -3808,7 +3821,7 @@
     "prelude-ls" "^1.2.1"
     "type-check" "~0.4.0"
 
-"libphonenumber-js@^1.10.53":
+"libphonenumber-js@^1.10.53", "libphonenumber-js@^1.9.43":
   "integrity" "sha512-Jr6v8thd5qRlOlc6CslSTzGzzQW03uiscab7KHQZX1Dfo4R6n6FDhZ0Hri6/X7edLIDv9gl4VMZXhxTjLnl0VQ=="
   "resolved" "https://registry.npmjs.org/libphonenumber-js/-/libphonenumber-js-1.11.17.tgz"
   "version" "1.11.17"
@@ -5677,7 +5690,7 @@
     "@types/istanbul-lib-coverage" "^2.0.1"
     "convert-source-map" "^2.0.0"
 
-"validator@^13.9.0":
+"validator@^13.7.0", "validator@^13.9.0":
   "integrity" "sha512-c1Q0mCiPlgdTVVVIJIrBuxNicYE+t/7oKeI9MWLj3fh/uq2Pxh/3eeWbVZ4OcGW1TUf53At0njHw5SMdA3tmMg=="
   "resolved" "https://registry.npmjs.org/validator/-/validator-13.12.0.tgz"
   "version" "13.12.0"

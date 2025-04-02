@@ -9,7 +9,7 @@ export class BatchAttendanceDto {
   @IsEnum(AttendanceType)
   userType: AttendanceType;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsMongoId()
   @Transform(({ value }) => new Types.ObjectId(value))
   classId: Types.ObjectId;

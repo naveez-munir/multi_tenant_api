@@ -19,22 +19,23 @@ export class TenantService {
   ) {}
 
   async createTenant(tenantData: Partial<Tenant>): Promise<TenantDocument> {
-    const savedTenant = await this.tenantModel.create({
-      name: tenantData.name,
-      databaseName: tenantData.databaseName
-    });
-    // Create a new connection for the tenant
-    const tenantConnection = await this.databaseService.createTenantConnection(savedTenant.databaseName);
-
-    //TODO create tenant super admin
-    const tenantAdminUser = {
-      name: 'Tenant Admin',
-      email: `tenantadmin@${savedTenant.name}.com`,
-      role: UserRole.TENANT_ADMIN,
-      password: 'password',
-    };
-    await this.userService.create(tenantConnection, tenantAdminUser);
-    return savedTenant;
+    try {
+      const savedTenant = await this.tenantModel.create(tenantData);
+      // Create a new connection for the tenant
+      const tenantConnection = await this.databaseService.createTenantConnection(savedTenant.databaseName);
+  
+      //TODO create tenant super admin
+      const tenantAdminUser = {
+        name: 'Tenant Admin',
+        email: `tenantadmin@${savedTenant.name}.com`,
+        role: UserRole.TENANT_ADMIN,
+        password: 'password',
+      };
+      await this.userService.create(tenantConnection, tenantAdminUser);
+      return savedTenant;
+    } catch (error) {
+      console.log('>>>>>', error)
+    }
   }
 
   async getTenantById(id: string): Promise<TenantDocument> {

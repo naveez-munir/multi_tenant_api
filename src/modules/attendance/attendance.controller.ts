@@ -17,6 +17,7 @@ import { CreateAttendanceDto } from "./dto/create-attendance-dto";
 import { UpdateAttendanceDto } from "./dto/update-attendance-dto";
 import { JwtAuthGuard } from "src/auth/guards/jwt-auth.guard";
 import { BatchAttendanceDto, ClassAttendanceFilterDto, MonthlyReportFilterDto, UserAttendanceFilterDto } from "./dto/batch-attendance.dto";
+import { AttendanceType } from "src/common/interfaces/attendanceType";
 
 @Controller('attendance')
 @UseGuards(JwtAuthGuard, TenantGuard)
@@ -31,9 +32,28 @@ export class AttendanceController {
     return this.attendanceService.createAttendance(req['tenantConnection'], createDto);
   }
   @Get()
-  async getAllAttendance(@Req() req: Request) {
-    return this.attendanceService.getAllAttendance(req['tenantConnection']);
+async getAllAttendance(
+  @Req() req: Request,
+  @Query('userType') userType?: AttendanceType,
+  @Query('startDate') startDate?: string,
+  @Query('endDate') endDate?: string,
+) {
+  const filters: any = {};
+  
+  if (userType) {
+    filters.userType = userType;
   }
+
+  if (startDate) {
+    filters.startDate = new Date(startDate);
+  }
+
+  if (endDate) {
+    filters.endDate = new Date(endDate);
+  }
+
+  return this.attendanceService.getAllAttendance(req['tenantConnection'], filters);
+}
 
   @Get(':id')
   async getAttendanceById(

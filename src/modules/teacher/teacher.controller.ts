@@ -15,9 +15,8 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 import { TeacherService } from './teacher.service';
-import { CreateTeacherDto, DocumentDto, EducationHistoryDto } from './dto/create-teacher.dto';
+import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
-import { ExperienceDto } from './dto/experience.dto';
 import { TeacherListResponseDto } from './dto/teacher-list-response.dto';
 import { CurrentTenant } from '../../common/decorators/tenant.decorator';
 import { TenantGuard } from '../tenant/guards/tenant.guard';
@@ -25,6 +24,7 @@ import { Tenant } from '../tenant/schemas/tenant.schema';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { Teacher } from './schemas/teacher.schema';
 import { SearchTeacherDto } from './dto/search-student.dto';
+import { DocumentDto, EducationHistoryDto, ExperienceDto } from 'src/common/dto';
 
 @Controller('teachers')
 @UseGuards(TenantGuard, JwtAuthGuard)

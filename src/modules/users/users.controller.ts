@@ -1,13 +1,27 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Req, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { UsersService } from './users.service';
 import { TenantGuard } from '../tenant/guards/tenant.guard';
-import { CurrentTenant } from '../../common/decorators/tenant.decorator';
-import { Tenant } from '../tenant/schemas/tenant.schema';
 import { User } from './schemas/user.schema';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { IsAllowedToCreateUserGuard } from 'src/common/decorators/is-admin-base-role.decorator';
 import { UserRole } from 'src/common/interfaces/roleEnum';
+import { StudentSchema } from '../student/schemas/student.schema';
+import { TeacherSchema } from '../teacher/schemas/teacher.schema';
+import { StaffSchema } from '../staff/schema/staff.schema';
+import { GuardianSchema } from '../student/schemas/guardian.schema';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, TenantGuard, IsAllowedToCreateUserGuard)
@@ -15,25 +29,13 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  async findAll(
-    @CurrentTenant() tenant: Tenant,
-    @Req() req: Request
-  ) {
-    return this.usersService.findUsers(
-      req['tenantConnection'],
-    );
+  async findAll(@Req() req: Request) {
+    return this.usersService.findUsers(req['tenantConnection']);
   }
 
   @Get(':id')
-  async findOne(
-    @CurrentTenant() tenant: Tenant,
-    @Req() req: Request,
-    @Param('id') id: string
-  ) {
-    const user = await this.usersService.findById(
-      req['tenantConnection'],
-      id
-    );
+  async findOne(@Req() req: Request, @Param('id') id: string) {
+    const user = await this.usersService.findById(req['tenantConnection'], id);
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -41,30 +43,50 @@ export class UsersController {
   }
 
   @Post()
-  async create(
-    @CurrentTenant() tenant: Tenant,
-    @Req() req: Request,
-    @Body() userData: Partial<User>
-  ) {
+  async create(@Req() req: Request, @Body() userData: Partial<User>) {
     try {
-      const user = await this.usersService.create(
-        req['tenantConnection'],
-        userData
-      );
-
-      // After user creation, update the corresponding entity with the userId
       const connection = req['tenantConnection'];
-      if (user.role === UserRole.STUDENT) {
-        const studentModel = connection.model('Student');
-        await studentModel.findOneAndUpdate(
+      let entityModel;
+      let entityType;
+      if (userData.role === UserRole.STUDENT) {
+        entityModel = connection.model('Student', StudentSchema);
+        entityType = 'student';
+      } else if (userData.role === UserRole.TEACHER) {
+        entityModel = connection.model('Teacher', TeacherSchema);
+        entityType = 'teacher';
+      } else if (userData.role === UserRole.PARENT) {
+        entityModel = connection.model('Guardian', GuardianSchema);
+        entityType = 'teacher';
+      } else if (
+        [
+          UserRole.ACCOUNTANT,
+          UserRole.LIBRARIAN,
+          UserRole.ADMIN,
+          UserRole.PRINCIPAL,
+          UserRole.DRIVER,
+          UserRole.SECURITY,
+          UserRole.CLEANER,
+          UserRole.TENANT_ADMIN,
+        ].includes(userData.role)
+      ) {
+        entityModel = connection.model('Staff', StaffSchema);
+        entityType = 'staff member';
+      }
+
+      if (entityModel) {
+        const entity = await entityModel.findOne({ cniNumber: userData.cnic });
+        if (!entity) {
+          throw new BadRequestException(
+            `No ${entityType} found with the provided CNIC number`,
+          );
+        }
+      }
+
+      const user = await this.usersService.create(connection, userData);
+      if (entityModel) {
+        await entityModel.findOneAndUpdate(
           { cniNumber: user.cnic },
-          { userId: user._id }
-        );
-      } else if (user.role === UserRole.TEACHER) {
-        const teacherModel = connection.model('Teacher');
-        await teacherModel.findOneAndUpdate(
-          { cniNumber: user.cnic },
-          { userId: user._id }
+          { userId: user._id },
         );
       }
 
@@ -76,15 +98,14 @@ export class UsersController {
 
   @Put(':id')
   async update(
-    @CurrentTenant() tenant: Tenant,
     @Req() req: Request,
     @Param('id') id: string,
-    @Body() updateData: Partial<User>
+    @Body() updateData: Partial<User>,
   ) {
     const user = await this.usersService.updateUser(
       req['tenantConnection'],
       id,
-      updateData
+      updateData,
     );
     if (!user) {
       throw new NotFoundException('User not found');
@@ -94,16 +115,15 @@ export class UsersController {
 
   @Put(':id/password')
   async updatePassword(
-    @CurrentTenant() tenant: Tenant,
     @Req() req: Request,
     @Param('id') id: string,
-    @Body() passwordData: { currentPassword: string; newPassword: string }
+    @Body() passwordData: { currentPassword: string; newPassword: string },
   ) {
     const updated = await this.usersService.updatePassword(
       req['tenantConnection'],
       id,
       passwordData.currentPassword,
-      passwordData.newPassword
+      passwordData.newPassword,
     );
     if (!updated) {
       throw new BadRequestException('Invalid current password');
@@ -112,15 +132,8 @@ export class UsersController {
   }
 
   @Delete(':id')
-  async remove(
-    @CurrentTenant() tenant: Tenant,
-    @Req() req: Request,
-    @Param('id') id: string
-  ) {
-    const deleted = await this.usersService.delete(
-      req['tenantConnection'],
-      id
-    );
+  async remove(@Req() req: Request, @Param('id') id: string) {
+    const deleted = await this.usersService.delete(req['tenantConnection'], id);
     if (!deleted) {
       throw new NotFoundException('User not found');
     }
@@ -128,14 +141,10 @@ export class UsersController {
   }
 
   @Put(':id/status')
-  async toggleStatus(
-    @CurrentTenant() tenant: Tenant,
-    @Req() req: Request,
-    @Param('id') id: string
-  ) {
+  async toggleStatus(@Req() req: Request, @Param('id') id: string) {
     const user = await this.usersService.toggleUserStatus(
       req['tenantConnection'],
-      id
+      id,
     );
     if (!user) {
       throw new NotFoundException('User not found');

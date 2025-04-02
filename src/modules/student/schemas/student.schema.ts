@@ -9,17 +9,8 @@ export class Student extends BaseUserEntity {
   @Prop({ required: true })
   dateOfBirth: Date;
 
-  // Parent/Guardian Information
-  @Prop({
-    type: {
-      name: { type: String, required: true },
-      cniNumber: { type: String, required: true },
-      relationship: { type: String, enum: ['Father', 'Mother', 'Guardian', 'Other'], required: true },
-      phone: { type: String, required: true },
-      email: { type: String },
-    },
-  })
-  guardian: Record<string, any>;
+  @Prop({ type: Types.ObjectId, ref: 'Guardian' })
+  guardian: Types.ObjectId;
 
   // Academic Information
   @Prop({ required: true })
@@ -79,6 +70,6 @@ export class Student extends BaseUserEntity {
 
 export const StudentSchema = SchemaFactory.createForClass(Student);
 
-StudentSchema.index({ firstName: 1,email: 1,  cniNumber: 1,});
+// StudentSchema.index({ firstName: 1,email: 1,  cniNumber: 1,});
 
 

@@ -9,7 +9,7 @@ export class Class extends BaseEntity {
   @Prop({ required: true })
   className: string;
 
-  @Prop({ default: null})
+  @Prop({ default: 'A'})
   classSection: string;
 
   @Prop()

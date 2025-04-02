@@ -22,17 +22,22 @@ export class CreateStudentDto extends BaseUserDto {
   @MaxDate(new Date(), { message: 'Date of birth cannot be in the future' })
   dateOfBirth: Date;
 
-  @IsNotEmpty({ message: 'Guardian information is required' })
+  @IsOptional()
   @ValidateNested()
   @Type(() => GuardianDto)
-  guardian: GuardianDto;
+  guardian?: GuardianDto;
+
+  @IsOptional()
+  @IsMongoId({ message: 'Invalid guardian ID format' })
+  @Transform(({ value }) => (Types.ObjectId.isValid(value) ? new Types.ObjectId(String(value)) : value))
+  guardianId?: Types.ObjectId;
 
   @IsNotEmpty({ message: 'Grade level is required' })
   @IsString({ message: 'Grade level must be a string' })
   gradeLevel: string;
 
   @IsOptional()
-  @IsMongoId({ message: 'Invalid class ID format' })
+  // @IsMongoId({ message: 'Invalid class ID format' })
   @Transform(({ value }) => (Types.ObjectId.isValid(value) ? new Types.ObjectId(String(value)) : value))
   class?: Types.ObjectId;
 

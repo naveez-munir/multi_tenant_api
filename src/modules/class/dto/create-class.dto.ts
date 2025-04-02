@@ -31,3 +31,8 @@ export class CreateClassDto {
   @Transform(({ value }) => (Types.ObjectId.isValid(value) ? new Types.ObjectId(String(value)) : value))
   classSubjects?: Types.ObjectId[];
 }
+
+export enum TeacherType {
+  MAIN = 'main',
+  TEMPORARY = 'temp'
+}

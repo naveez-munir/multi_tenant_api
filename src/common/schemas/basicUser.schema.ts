@@ -18,7 +18,7 @@ export class BaseUserEntity extends BaseEntity {
   @Prop({ required: true })
   lastName: string;
 
-  @Prop({ unique: true, default: null })
+  @Prop({ unique: true, sparse: true })
   email?: string;
 
   @Prop({ enum: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] })
