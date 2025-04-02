@@ -24,16 +24,9 @@ export class EmergencyContactDto {
 }
 
 export class CreateStaffDto extends BaseEmployeeDto {
-  @IsEnum([
-    UserRole.ACCOUNTANT,
-    UserRole.LIBRARIAN,
-    UserRole.ADMIN,
-    UserRole.PRINCIPAL,
-    UserRole.DRIVER,
-    UserRole.SECURITY,
-    UserRole.CLEANER,
-    UserRole.TENANT_ADMIN,
-  ])
+  @IsEnum(UserRole, { 
+    message: 'designation must be one of the following values: ACCOUNTANT, LIBRARIAN, ADMIN, PRINCIPAL, DRIVER, SECURITY, CLEANER, TENANT_ADMIN' 
+  })
   designation: UserRole;
 
   @IsOptional()

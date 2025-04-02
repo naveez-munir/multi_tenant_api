@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { Connection, Types } from 'mongoose';
 import { BaseService } from '../../common/services/base.service';
 import { CreateStaffDto, UpdateStaffDto } from './dto/create-staff.dto';
@@ -7,17 +7,12 @@ import { StaffDetailResponseDto, StaffListResponseDto } from './dto/staff-list-r
 import { SearchStaffDto } from './dto/search-staff.dto';
 import { EmergencyContactDto } from './dto/create-staff.dto';
 import { Staff, StaffSchema } from './schema/staff.schema';
+import { MongoDbUtils } from '../../common/utils/mongodb.utils';
 
 @Injectable()
 export class StaffService extends BaseService<Staff> {
   constructor() {
     super('Staff', StaffSchema);
-  }
-
-  private validateObjectId(id: string, fieldName: string): void {
-    if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException(`Invalid ${fieldName} ID format`);
-    }
   }
 
   async createStaff(
@@ -30,7 +25,7 @@ export class StaffService extends BaseService<Staff> {
       const staffData = {
         ...createDto,
         ...(createDto.userId && {
-          userId: new Types.ObjectId(createDto.userId.toString())
+          userId: MongoDbUtils.toObjectIdOrNull(createDto.userId.toString())
         })
       };
 
@@ -49,74 +44,60 @@ export class StaffService extends BaseService<Staff> {
     connection: Connection, 
     searchDto: SearchStaffDto
   ) {
-    try {
-      const repository = this.getRepository(connection);
-      const query: Record<string, any> = {};
+    const repository = this.getRepository(connection);
+    const query: Record<string, any> = {};
 
-      if (searchDto.firstName) {
-        query.firstName = { $regex: searchDto.firstName, $options: 'i' };
-      }
-      if (searchDto.lastName) {
-        query.lastName = { $regex: searchDto.lastName, $options: 'i' };
-      }
-      if (searchDto.cniNumber) {
-        query.cniNumber = searchDto.cniNumber;
-      }
-      if (searchDto.employmentStatus) {
-        query.employmentStatus = searchDto.employmentStatus;
-      }
-      if (searchDto.designation) {
-        query.designation = searchDto.designation;
-      }
-      if (searchDto.department) {
-        query.department = { $regex: searchDto.department, $options: 'i' };
-      }
-      if (searchDto.gender) {
-        query.gender = searchDto.gender;
-      }
-
-      const staffMembers = await repository.findWithOptions(query, {
-        sort: { firstName: 1, lastName: 1 }
-      });
-      
-      return staffMembers.map(staff => StaffListResponseDto.fromEntity(staff));
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to search staff members');
+    if (searchDto.firstName) {
+      query.firstName = { $regex: searchDto.firstName, $options: 'i' };
     }
+    if (searchDto.lastName) {
+      query.lastName = { $regex: searchDto.lastName, $options: 'i' };
+    }
+    if (searchDto.cniNumber) {
+      query.cniNumber = searchDto.cniNumber;
+    }
+    if (searchDto.employmentStatus) {
+      query.employmentStatus = searchDto.employmentStatus;
+    }
+    if (searchDto.designation) {
+      query.designation = searchDto.designation;
+    }
+    if (searchDto.department) {
+      query.department = { $regex: searchDto.department, $options: 'i' };
+    }
+    if (searchDto.gender) {
+      query.gender = searchDto.gender;
+    }
+
+    const staffMembers = await repository.findWithOptions(query, {
+      sort: { firstName: 1, lastName: 1 }
+    });
+    
+    return staffMembers.map(staff => StaffListResponseDto.fromEntity(staff));
   }
 
   async findById(
     connection: Connection,
     id: string
   ): Promise<Staff> {
-    try {
-      this.validateObjectId(id, 'staff');
-      const repository = this.getRepository(connection);
+    MongoDbUtils.validateId(id, 'staff');
+    const repository = this.getRepository(connection);
 
-      const staff = await repository.findWithOptions(
-        { _id: new Types.ObjectId(id) },
-        {
-          populate: {
-            path: 'userId',
-            select: 'email'
-          }
+    const staff = await repository.findWithOptions(
+      { _id: new Types.ObjectId(id) },
+      {
+        populate: {
+          path: 'userId',
+          select: 'email'
         }
-      );
-
-      if (!staff || !staff.length) {
-        throw new NotFoundException('Staff member not found');
       }
+    );
 
-      return staff[0];
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to fetch staff member');
+    if (!staff || !staff.length) {
+      throw new NotFoundException('Staff member not found');
     }
+
+    return staff[0];
   }
 
   async getStaffDetail(
@@ -132,32 +113,25 @@ export class StaffService extends BaseService<Staff> {
     id: string,
     updateDto: UpdateStaffDto
   ): Promise<StaffListResponseDto> {
-    try {
-      this.validateObjectId(id, 'staff');
-      const repository = this.getRepository(connection);
-      
-      const updateData = {
-        ...updateDto,
-        ...(updateDto.userId && {
-          userId: new Types.ObjectId(updateDto.userId.toString())
-        })
-      };
+    MongoDbUtils.validateId(id, 'staff');
+    const repository = this.getRepository(connection);
+    
+    const updateData = {
+      ...updateDto,
+      ...(updateDto.userId && {
+        userId: MongoDbUtils.toObjectIdOrNull(updateDto.userId.toString())
+      })
+    };
 
-      await repository.findByIdAndUpdate(id, updateData);
+    await repository.findByIdAndUpdate(id, updateData);
 
-      const updatedStaff = await repository.findById(id);
+    const updatedStaff = await repository.findById(id);
 
-      if (!updatedStaff) {
-        throw new NotFoundException('Staff member not found');
-      }
-
-      return StaffListResponseDto.fromEntity(updatedStaff);
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to update staff member');
+    if (!updatedStaff) {
+      throw new NotFoundException('Staff member not found');
     }
+
+    return StaffListResponseDto.fromEntity(updatedStaff);
   }
 
   async addEducationHistory(
@@ -165,28 +139,12 @@ export class StaffService extends BaseService<Staff> {
     staffId: string,
     education: EducationHistoryDto
   ): Promise<StaffListResponseDto> {
-    try {
-      this.validateObjectId(staffId, 'staff');
-      const repository = this.getRepository(connection);
-      
-      const staff = await repository.findById(staffId);
-      if (!staff) {
-        throw new NotFoundException('Staff member not found');
-      }
-
-      const educationHistory = staff.educationHistory || [];
-      educationHistory.push(education);
-
-      await repository.findByIdAndUpdate(staffId, { educationHistory });
-
-      const updatedStaff = await repository.findById(staffId);
-      return StaffListResponseDto.fromEntity(updatedStaff);
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to add education history');
-    }
+    return this.updateStaffArray(
+      connection, 
+      staffId, 
+      'educationHistory', 
+      education
+    );
   }
 
   async addExperience(
@@ -194,28 +152,12 @@ export class StaffService extends BaseService<Staff> {
     staffId: string,
     experience: ExperienceDto
   ): Promise<StaffListResponseDto> {
-    try {
-      this.validateObjectId(staffId, 'staff');
-      const repository = this.getRepository(connection);
-      
-      const staff = await repository.findById(staffId);
-      if (!staff) {
-        throw new NotFoundException('Staff member not found');
-      }
-
-      const experienceList = staff.experience || [];
-      experienceList.push(experience);
-
-      await repository.findByIdAndUpdate(staffId, { experience: experienceList });
-
-      const updatedStaff = await repository.findById(staffId);
-      return StaffListResponseDto.fromEntity(updatedStaff);
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to add experience');
-    }
+    return this.updateStaffArray(
+      connection, 
+      staffId, 
+      'experience', 
+      experience
+    );
   }
 
   async addDocument(
@@ -223,28 +165,12 @@ export class StaffService extends BaseService<Staff> {
     staffId: string,
     document: DocumentDto
   ): Promise<StaffListResponseDto> {
-    try {
-      this.validateObjectId(staffId, 'staff');
-      const repository = this.getRepository(connection);
-      
-      const staff = await repository.findById(staffId);
-      if (!staff) {
-        throw new NotFoundException('Staff member not found');
-      }
-
-      const documents = staff.documents || [];
-      documents.push({ ...document, uploadDate: new Date() });
-
-      await repository.findByIdAndUpdate(staffId, { documents });
-
-      const updatedStaff = await repository.findById(staffId);
-      return StaffListResponseDto.fromEntity(updatedStaff);
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to add document');
-    }
+    return this.updateStaffArray(
+      connection, 
+      staffId, 
+      'documents', 
+      { ...document, uploadDate: new Date() }
+    );
   }
 
   async updateEmergencyContact(
@@ -252,25 +178,18 @@ export class StaffService extends BaseService<Staff> {
     staffId: string,
     emergencyContact: EmergencyContactDto
   ): Promise<StaffListResponseDto> {
-    try {
-      this.validateObjectId(staffId, 'staff');
-      const repository = this.getRepository(connection);
-      
-      const staff = await repository.findById(staffId);
-      if (!staff) {
-        throw new NotFoundException('Staff member not found');
-      }
-
-      await repository.findByIdAndUpdate(staffId, { emergencyContact });
-
-      const updatedStaff = await repository.findById(staffId);
-      return StaffListResponseDto.fromEntity(updatedStaff);
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to update emergency contact');
+    MongoDbUtils.validateId(staffId, 'staff');
+    const repository = this.getRepository(connection);
+    
+    const staff = await repository.findById(staffId);
+    if (!staff) {
+      throw new NotFoundException('Staff member not found');
     }
+
+    await repository.findByIdAndUpdate(staffId, { emergencyContact });
+
+    const updatedStaff = await repository.findById(staffId);
+    return StaffListResponseDto.fromEntity(updatedStaff);
   }
 
   async updateStaffStatus(
@@ -278,46 +197,56 @@ export class StaffService extends BaseService<Staff> {
     staffId: string,
     employmentStatus: string
   ): Promise<StaffListResponseDto> {
-    try {
-      this.validateObjectId(staffId, 'staff');
-      const repository = this.getRepository(connection);
+    MongoDbUtils.validateId(staffId, 'staff');
+    const repository = this.getRepository(connection);
 
-      await repository.findByIdAndUpdate(staffId, { employmentStatus });
+    await repository.findByIdAndUpdate(staffId, { employmentStatus });
 
-      const updatedStaff = await repository.findById(staffId);
+    const updatedStaff = await repository.findById(staffId);
 
-      if (!updatedStaff) {
-        throw new NotFoundException('Staff member not found');
-      }
-
-      return StaffListResponseDto.fromEntity(updatedStaff);
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to update staff status');
+    if (!updatedStaff) {
+      throw new NotFoundException('Staff member not found');
     }
+
+    return StaffListResponseDto.fromEntity(updatedStaff);
   }
 
   async deleteStaff(
     connection: Connection,
     staffId: string
   ): Promise<boolean> {
-    try {
-      this.validateObjectId(staffId, 'staff');
-      const repository = this.getRepository(connection);
-      
-      const result = await repository.delete(staffId);
-      if (!result) {
-        throw new NotFoundException('Staff member not found');
-      }
-
-      return true;
-    } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException('Failed to delete staff member');
+    MongoDbUtils.validateId(staffId, 'staff');
+    const repository = this.getRepository(connection);
+    
+    const result = await repository.delete(staffId);
+    if (!result) {
+      throw new NotFoundException('Staff member not found');
     }
+
+    return true;
+  }
+
+  // Private helper method to handle updating array fields
+  private async updateStaffArray<T>(
+    connection: Connection,
+    staffId: string,
+    fieldName: string,
+    item: T
+  ): Promise<StaffListResponseDto> {
+    MongoDbUtils.validateId(staffId, 'staff');
+    const repository = this.getRepository(connection);
+    
+    const staff = await repository.findById(staffId);
+    if (!staff) {
+      throw new NotFoundException('Staff member not found');
+    }
+
+    const currentArray = staff[fieldName] || [];
+    currentArray.push(item);
+
+    await repository.findByIdAndUpdate(staffId, { [fieldName]: currentArray });
+
+    const updatedStaff = await repository.findById(staffId);
+    return StaffListResponseDto.fromEntity(updatedStaff);
   }
 }
